@@ -1,9 +1,9 @@
 # Dialogflow Test Suite
 
-A comprehensive platform for testing Dialogflow CX agents with AI-powered evaluation, modern UI, and detailed analytics.
+A platform for testing Dialogflow CX agents with AI-powered evaluation, modern UI, and detailed analytics.
 
 ## 📦 **Repository**
-- **GitHub**: [dialogflow-test-suite](https://github.com/your-org/dialogflow-test-suite)
+- **GitHub**: [dialogflow-test-suite](https://github.com/davearlin/dialogflow-test-suite)
 - **Clone**: `git clone https://github.com/your-org/dialogflow-test-suite.git`
 
 ## 🌟 **Key Features**
