@@ -1,0 +1,19 @@
+{
+  "trainingPhrases": [
+    {
+      "parts": [{"text": "What browsers do you support?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "supported browsers"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "which browsers work"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    }
+  ]
+}

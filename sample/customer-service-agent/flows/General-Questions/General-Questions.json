@@ -1,0 +1,48 @@
+{
+  "name": "f7a7e3a3-3b7c-4b7c-8b7c-3b7c4b7c3b7c",
+  "displayName": "General-Questions",
+  "nluSettings": {
+    "modelType": "MODEL_TYPE_STANDARD",
+    "classificationThreshold": 0.3
+  },
+  "transitionRoutes": [
+    {
+      "intent": "faq",
+      "triggerFulfillment": {
+        "conditionalCases": [
+          {
+            "cases": [
+              {
+                "condition": "$session.params.product_category = \"Technical\"",
+                "caseContent": [
+                  {
+                    "message": {
+                      "text": {
+                        "text": [
+                          "For technical questions, please check our technical documentation at docs.example.com or contact our tech support team."
+                        ]
+                      },
+                      "languageCode": "en"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "messages": [
+          {
+            "text": {
+              "text": [
+                "I can answer questions about our products and services. What would you like to know?"
+              ]
+            },
+            "languageCode": "en"
+          }
+        ]
+      },
+      "targetPage": "Answer Question",
+      "name": "f3b3e3a3-3b7c-4b7c-8b7c-3b7c4b7c3b7c"
+    }
+  ]
+}

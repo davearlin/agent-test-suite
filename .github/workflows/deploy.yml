@@ -1,0 +1,325 @@
+name: Deploy to Google Cloud
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'design/**'
+      - 'README*'
+      - 'LICENSE*'
+      - '.gitignore'
+      - '.editorconfig'
+      - '**/.gitkeep'
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'design/**'
+      - 'README*'
+      - 'LICENSE*'
+      - '.gitignore'
+      - '.editorconfig'
+      - '**/.gitkeep'
+  workflow_dispatch:
+
+env:
+  REGION: us-central1
+  
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.set-env.outputs.environment }}
+      project_id: ${{ steps.set-env.outputs.project_id }}
+    steps:
+      - name: Determine environment
+        id: set-env
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "environment=dev" >> $GITHUB_OUTPUT
+            echo "project_id=${{ secrets.GCP_PROJECT_ID_DEV }}" >> $GITHUB_OUTPUT
+          else
+            echo "environment=dev" >> $GITHUB_OUTPUT
+            echo "project_id=${{ secrets.GCP_PROJECT_ID_DEV }}" >> $GITHUB_OUTPUT
+          fi
+
+  build:
+    runs-on: ubuntu-latest
+    needs: setup
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+      - name: Debug project ID
+        run: |
+          echo "Setup job project_id output: ${{ needs.setup.outputs.project_id }}"
+          echo "Environment GOOGLE_CLOUD_PROJECT: $GOOGLE_CLOUD_PROJECT"
+          echo "Will use project ID: ${GOOGLE_CLOUD_PROJECT}"
+        env:
+          GOOGLE_CLOUD_PROJECT: ${{ needs.setup.outputs.project_id }}
+
+      - name: Build and push backend image
+        env:
+          PROJECT_ID: ${{ needs.setup.outputs.project_id }}
+        run: |
+          cd backend
+          # Use environment variable fallback if job output is empty
+          EFFECTIVE_PROJECT_ID="${PROJECT_ID:-$GOOGLE_CLOUD_PROJECT}"
+          echo "Using project ID: $EFFECTIVE_PROJECT_ID"
+          REGISTRY="${{ env.REGION }}-docker.pkg.dev/${EFFECTIVE_PROJECT_ID}/dialogflow-tester-images"
+          docker build -t ${REGISTRY}/dialogflow-tester-backend:${{ github.sha }} .
+          docker build -t ${REGISTRY}/dialogflow-tester-backend:latest .
+          docker push ${REGISTRY}/dialogflow-tester-backend:${{ github.sha }}
+          docker push ${REGISTRY}/dialogflow-tester-backend:latest
+
+  terraform:
+    runs-on: ubuntu-latest
+    needs: [setup, build]
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.13.3"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Terraform Init
+        run: |
+          cd terraform
+          terraform init
+
+      - name: Create terraform.tfvars
+        env:
+          PROJECT_ID: ${{ needs.setup.outputs.project_id }}
+        run: |
+          cd terraform
+          cp terraform.tfvars.${{ needs.setup.outputs.environment }} terraform.tfvars
+          EFFECTIVE_PROJECT_ID="${PROJECT_ID:-$GOOGLE_CLOUD_PROJECT}"
+          echo "Using project ID for terraform: $EFFECTIVE_PROJECT_ID"
+          sed -i "s/YOUR_PROJECT_ID_HERE/${EFFECTIVE_PROJECT_ID}/g" terraform.tfvars
+
+      - name: Terraform Plan
+        env:
+          PROJECT_ID: ${{ needs.setup.outputs.project_id }}
+          TF_VAR_google_oauth_client_id: ${{ secrets.TF_VAR_GOOGLE_OAUTH_CLIENT_ID }}
+          TF_VAR_google_oauth_client_secret: ${{ secrets.TF_VAR_GOOGLE_OAUTH_CLIENT_SECRET }}
+          TF_VAR_jwt_secret_key: ${{ secrets.TF_VAR_JWT_SECRET_KEY }}
+          TF_VAR_database_password: ${{ secrets.TF_VAR_POSTGRES_PASSWORD }}
+          TF_VAR_google_api_key: ${{ secrets.GOOGLE_API_KEY }}
+        run: |
+          cd terraform
+          EFFECTIVE_PROJECT_ID="${PROJECT_ID:-$GOOGLE_CLOUD_PROJECT}"
+          REGISTRY="${{ env.REGION }}-docker.pkg.dev/${EFFECTIVE_PROJECT_ID}/dialogflow-tester-images"
+          terraform plan -var="project_id=${EFFECTIVE_PROJECT_ID}" \
+                        -var="environment=${{ needs.setup.outputs.environment }}" \
+                        -var="backend_image=${REGISTRY}/dialogflow-tester-backend:${{ github.sha }}" \
+                        -out=tfplan
+
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+        env:
+          TF_VAR_google_oauth_client_id: ${{ secrets.TF_VAR_GOOGLE_OAUTH_CLIENT_ID }}
+          TF_VAR_google_oauth_client_secret: ${{ secrets.TF_VAR_GOOGLE_OAUTH_CLIENT_SECRET }}
+          TF_VAR_jwt_secret_key: ${{ secrets.TF_VAR_JWT_SECRET_KEY }}
+          TF_VAR_database_password: ${{ secrets.TF_VAR_POSTGRES_PASSWORD }}
+          TF_VAR_google_api_key: ${{ secrets.GOOGLE_API_KEY }}
+        run: |
+          cd terraform
+          terraform apply -auto-approve tfplan
+
+      - name: Deploy to Firebase Hosting
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+        env:
+          PROJECT_ID: ${{ needs.setup.outputs.project_id }}
+        run: |
+          cd terraform
+          # Get the actual backend URL from Terraform
+          BACKEND_URL=$(terraform output -raw backend_url)
+          echo "Backend URL from Terraform: ${BACKEND_URL}"
+          
+          cd ../frontend
+          # Install dependencies first
+          npm ci
+          
+          # Remove .env.local to prevent it from overriding production config
+          if [ -f .env.local ]; then
+            echo "Temporarily renaming .env.local to use production config"
+            mv .env.local .env.local.backup
+          fi
+          
+          # Create a temporary .env.production with the actual backend URL
+          echo "Creating .env.production with dynamic backend URL"
+          echo "VITE_API_BASE_URL=${BACKEND_URL}" > .env.production
+          
+          # Show the production environment configuration
+          echo "Using dynamic .env.production:"
+          cat .env.production
+          
+          # Build with production environment
+          npm run build
+          
+          # Deploy to Firebase Hosting using firebase.json in frontend directory
+          EFFECTIVE_PROJECT_ID="${PROJECT_ID:-$GOOGLE_CLOUD_PROJECT}"
+          echo "Deploying to Firebase in project: ${EFFECTIVE_PROJECT_ID}"
+          echo "Using site configured in firebase.json"
+          
+          # Deploy to Firebase Hosting (firebase.json is now in frontend directory)
+          npx firebase deploy --only hosting --project ${EFFECTIVE_PROJECT_ID}
+
+      - name: Output deployment URLs
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+        run: |
+          cd terraform
+          echo "🚀 Deployment complete!"
+          echo "Frontend URL: $(terraform output -raw frontend_url)"
+          echo "Backend URL: $(terraform output -raw backend_url)"
+          echo "Environment: ${{ needs.setup.outputs.environment }}"
+
+  test:
+    runs-on: ubuntu-latest
+    needs: setup
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: agent_evaluator_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+
+      - name: Set up test environment
+        run: |
+          cd backend
+          # Create test environment variables
+          cat > .env.test << EOF
+          SECRET_KEY=test-secret-key-for-ci
+          POSTGRES_SERVER=localhost
+          POSTGRES_USER=postgres
+          POSTGRES_PASSWORD=password
+          POSTGRES_DB=agent_evaluator
+          REDIS_URL=redis://localhost:6379
+          TESTING=true
+          EOF
+
+      - name: Initialize test database
+        run: |
+          cd backend
+          # Use test environment and initialize database
+          export $(cat .env.test | xargs)
+          python -c "from app.init_db import init_db; init_db()"
+
+      - name: Run backend tests
+        run: |
+          cd backend
+          # Use test environment
+          export $(cat .env.test | xargs)
+          python -m pytest tests/ --no-header -v
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build
+
+      - name: Run frontend tests
+        run: |
+          cd frontend
+          npm test

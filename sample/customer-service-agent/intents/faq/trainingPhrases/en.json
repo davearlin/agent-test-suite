@@ -1,0 +1,239 @@
+{
+  "trainingPhrases": [
+    {
+      "parts": [{"text": "What are your services?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "Tell me about your products"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "How much does it cost?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "What are your hours?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "What are your business hours?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "How can I contact customer support?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "How do I reset my password?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "What is your return policy?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "Do you offer international shipping?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "Where are you located?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "What payment methods do you accept?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "How can I track my order?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "What is your privacy policy?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "Do you have a mobile app?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "How do I create an account?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "How do I update my account information?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "What is your shipping policy?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "How long does shipping take?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "How do I cancel my order?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "Do you offer discounts or promotions?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "What is your warranty policy?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "Do you have a rewards program?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "What are your terms of service?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "What are your security measures?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "How do I report a security vulnerability?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "What is your accessibility statement?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "What is your cookie policy?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "How do I manage my cookie settings?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "How do I troubleshoot login issues?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "What browsers do you support?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "Why is the website loading slowly?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "How do I clear my browser cache?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "Do you have an API for developers?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "What are the system requirements?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "How do I enable JavaScript in my browser?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "How do I update my browser?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "What is two-factor authentication?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "How do I enable two-factor authentication?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "I forgot my security question answer, what should I do?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "How do I download my account data?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "What file formats do you support for uploads?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "Why am I getting an error message?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "How do I configure email notifications?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "Can I integrate with third-party tools?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "What is your API rate limit?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "How do I generate an API key?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "What encryption do you use?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    }
+  ]
+}

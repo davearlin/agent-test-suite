@@ -1,0 +1,12 @@
+{
+  "displayName": "agent-tester-sample-agent",
+  "defaultLanguageCode": "en",
+  "timeZone": "America/Chicago",
+  "advancedSettings": {
+    "loggingSettings": {
+      "enableStackdriverLogging": true,
+      "enableInteractionLogging": true
+    }
+  },
+  "startFlow": "Default Start Flow"
+}

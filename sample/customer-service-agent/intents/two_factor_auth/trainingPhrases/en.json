@@ -1,0 +1,24 @@
+{
+  "trainingPhrases": [
+    {
+      "parts": [{"text": "What is two-factor authentication?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "How do I enable two-factor authentication?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "two-factor authentication"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "2FA"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    }
+  ]
+}

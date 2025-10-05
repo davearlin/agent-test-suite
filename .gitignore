@@ -1,0 +1,97 @@
+# Git Backup (old repository history)
+.git.backup/
+
+# Service Account Keys
+service-account.json
+
+# Environment Variables and Deployment Config
+.env
+.env.local
+.env.development.local
+.env.test
+.env.test.local
+.env.production.local
+.env.gcp
+DEPLOYMENT_CONFIG.md
+
+# Terraform Environment Variables (contain secrets)
+terraform/terraform-env.sh
+terraform/Set-TerraformVars.ps1
+
+# Experimental/Debug Files
+grant_*.py
+grant_*.sql
+fix_*.sql
+setup_permissions.py
+cloud-sql-proxy.exe
+cloud-run-service.yaml
+
+# Dependencies
+node_modules/
+*/node_modules/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# IDE Files
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# OS Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Debug and Test Scripts (not for production, in root directory only)
+/debug_*.py
+/test_*.py
+
+# Docker
+.dockerignore
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+
+# Database
+*.db
+*.sqlite3
+
+# Testing
+.coverage
+.pytest_cache/
+coverage/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Temp folder for analysis/comparison
+temp/
+
+# Firebase
+.firebase/
+
+# Terraform files are handled by terraform/.gitignore

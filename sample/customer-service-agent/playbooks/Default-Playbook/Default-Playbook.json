@@ -1,0 +1,20 @@
+{
+  "name": "e1f2a3b4-c5d6-e7f8-a9b0-c1d2e3f4a5b6",
+  "displayName": "Default-Playbook",
+  "referencedTools": [],
+  "steps": [
+    {
+      "text": "The user wants to ask a general question.",
+      "toolUse": {
+        "tool": "faq-tool",
+        "action": "answer_question",
+        "input": {
+          "question": "$session.params.last_user_utterance"
+        },
+        "output": {
+          "answer": "$tool.answer"
+        }
+      }
+    }
+  ]
+}

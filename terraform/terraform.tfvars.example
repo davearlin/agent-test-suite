@@ -1,0 +1,40 @@
+# Example Terraform Variables File
+# Copy this file to terraform.tfvars and update with your actual values
+
+# GCP Project Configuration
+project_id = "your-gcp-project-id"
+region     = "us-central1"
+zone       = "us-central1-a" 
+environment = "dev"
+
+# Application Configuration
+app_name = "dialogflow-tester"
+cors_origins = "*"
+
+# Database Configuration
+database_name     = "dialogflow_tester_dev"
+database_user     = "app_user_dev"
+db_tier          = "db-f1-micro"
+
+# Docker Images (will be built by CI/CD)
+backend_image  = "us-central1-docker.pkg.dev/your-gcp-project-id/dialogflow-tester-images/dialogflow-tester-backend:latest"
+
+# OAuth Configuration (passed via TF_VAR environment variables in CI/CD)
+# google_oauth_client_id     = "set via TF_VAR_google_oauth_client_id"
+# google_oauth_client_secret = "set via TF_VAR_google_oauth_client_secret"
+google_oauth_redirect_uri    = "https://your-backend-url.run.app/api/v1/auth/google/callback"
+frontend_url                 = "https://your-frontend-url.web.app"
+
+# JWT Secret Key (passed via TF_VAR environment variable in CI/CD)
+# jwt_secret_key = "set via TF_VAR_jwt_secret_key"
+
+# Firebase Configuration
+# For new environments: set create_firebase_app = true to create new Firebase app
+# For existing environments: set create_firebase_app = false and provide existing_firebase_app_id
+create_firebase_app = true  # Set to false when importing existing Firebase app
+existing_firebase_app_id = ""  # Set to existing Firebase app ID when create_firebase_app = false
+
+# Example for different environments:
+# Dev: existing_firebase_app_id = "1:PROJECT_NUMBER:web:APP_ID_DEV"
+# Staging: existing_firebase_app_id = "1:PROJECT_NUMBER:web:APP_ID_STAGING" 
+# Prod: existing_firebase_app_id = "1:PROJECT_NUMBER:web:APP_ID_PROD"

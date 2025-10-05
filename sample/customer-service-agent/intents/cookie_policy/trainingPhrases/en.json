@@ -1,0 +1,24 @@
+{
+  "trainingPhrases": [
+    {
+      "parts": [{"text": "What is your cookie policy?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "How do I manage my cookie settings?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "cookie policy"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "manage cookies"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    }
+  ]
+}

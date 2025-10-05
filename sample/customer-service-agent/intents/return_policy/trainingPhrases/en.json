@@ -1,0 +1,19 @@
+{
+  "trainingPhrases": [
+    {
+      "parts": [{"text": "What is your return policy?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "return policy"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "can I return items"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "trainingPhrases": [
+    {
+      "parts": [{"text": "Do you offer international shipping?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "How long does shipping take?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "shipping information"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "international shipping"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    }
+  ]
+}

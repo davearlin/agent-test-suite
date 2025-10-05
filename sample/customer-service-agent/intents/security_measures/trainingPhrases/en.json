@@ -1,0 +1,19 @@
+{
+  "trainingPhrases": [
+    {
+      "parts": [{"text": "What are your security measures?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "security measures"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "how secure is your site"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    }
+  ]
+}

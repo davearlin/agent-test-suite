@@ -1,0 +1,19 @@
+{
+  "trainingPhrases": [
+    {
+      "parts": [{"text": "What are your business hours?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "business hours"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "when are you open"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    }
+  ]
+}

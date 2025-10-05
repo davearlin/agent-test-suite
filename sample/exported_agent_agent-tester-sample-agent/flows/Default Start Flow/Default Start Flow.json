@@ -1,0 +1,237 @@
+{
+  "name": "00000000-0000-0000-0000-000000000000",
+  "displayName": "Default Start Flow",
+  "description": "A start flow created along with the agent",
+  "transitionRoutes": [
+    {
+      "intent": "Default Welcome Intent",
+      "triggerFulfillment": {
+        "messages": [
+          {
+            "text": {
+              "text": [
+                "Hello! How can I help you today?"
+              ]
+            },
+            "languageCode": "en"
+          }
+        ]
+      },
+      "name": "feb1f2e3-fef9-48e0-b347-7a47d024154f"
+    },
+    {
+      "intent": "password_reset",
+      "triggerFulfillment": {
+        "messages": [
+          {
+            "text": {
+              "text": [
+                "You can reset your password by clicking on the 'Forgot Password' link on the login page."
+              ]
+            },
+            "languageCode": "en"
+          }
+        ]
+      },
+      "name": "route-password-reset-001"
+    },
+    {
+      "intent": "security_measures",
+      "triggerFulfillment": {
+        "messages": [
+          {
+            "text": {
+              "text": [
+                "We take security very seriously and have implemented a variety of measures to protect your personal and financial information."
+              ]
+            },
+            "languageCode": "en"
+          }
+        ]
+      },
+      "name": "route-security-measures-002"
+    },
+    {
+      "intent": "browser_support",
+      "triggerFulfillment": {
+        "messages": [
+          {
+            "text": {
+              "text": [
+                "We support the latest versions of Chrome, Firefox, Safari, and Edge browsers."
+              ]
+            },
+            "languageCode": "en"
+          }
+        ]
+      },
+      "name": "route-browser-support-003"
+    },
+    {
+      "intent": "api_info",
+      "triggerFulfillment": {
+        "messages": [
+          {
+            "text": {
+              "text": [
+                "Yes, we offer an API for developers. You can find documentation and access information on our developer portal."
+              ]
+            },
+            "languageCode": "en"
+          }
+        ]
+      },
+      "name": "route-api-info-004"
+    },
+    {
+      "intent": "two_factor_auth",
+      "triggerFulfillment": {
+        "messages": [
+          {
+            "text": {
+              "text": [
+                "Two-factor authentication (2FA) is an additional security layer that requires not only a password but also a second form of verification. You can enable it in your account security settings and we'll guide you through the setup process."
+              ]
+            },
+            "languageCode": "en"
+          }
+        ]
+      },
+      "name": "route-two-factor-auth-005"
+    },
+    {
+      "intent": "business_hours",
+      "triggerFulfillment": {
+        "messages": [
+          {
+            "text": {
+              "text": [
+                "Our business hours are Monday to Friday, 9 AM to 5 PM."
+              ]
+            },
+            "languageCode": "en"
+          }
+        ]
+      },
+      "name": "route-business-hours-006"
+    },
+    {
+      "intent": "contact_support",
+      "triggerFulfillment": {
+        "messages": [
+          {
+            "text": {
+              "text": [
+                "You can contact customer support by phone at 1-800-123-4567 or by email at support@example.com."
+              ]
+            },
+            "languageCode": "en"
+          }
+        ]
+      },
+      "name": "route-contact-support-007"
+    },
+    {
+      "intent": "return_policy",
+      "triggerFulfillment": {
+        "messages": [
+          {
+            "text": {
+              "text": [
+                "Our return policy allows you to return any item within 30 days of purchase for a full refund."
+              ]
+            },
+            "languageCode": "en"
+          }
+        ]
+      },
+      "name": "route-return-policy-008"
+    },
+    {
+      "intent": "shipping_info",
+      "triggerFulfillment": {
+        "messages": [
+          {
+            "text": {
+              "text": [
+                "Yes, we offer international shipping to most countries. Shipping fees may vary. Standard shipping usually takes 3-5 business days."
+              ]
+            },
+            "languageCode": "en"
+          }
+        ]
+      },
+      "name": "route-shipping-info-009"
+    },
+    {
+      "intent": "cookie_policy",
+      "triggerFulfillment": {
+        "messages": [
+          {
+            "text": {
+              "text": [
+                "Our cookie policy explains how we use cookies to improve your browsing experience and to personalize our content and advertising. You can manage your cookie settings by clicking on the 'Cookie Settings' link in the footer of our website."
+              ]
+            },
+            "languageCode": "en"
+          }
+        ]
+      },
+      "name": "route-cookie-policy-010"
+    },
+    {
+      "intent": "faq",
+      "triggerFulfillment": {
+        "messages": [
+          {
+            "text": {
+              "text": [
+                "I can help you with that! For account-related questions like password resets, account settings, or data downloads, please visit your account settings page or contact our support team at support@example.com. For technical questions about browsers, system requirements, or integrations, check our technical documentation at docs.example.com. For general information about our services, shipping, returns, or policies, visit our FAQ page or reach out to customer support at 1-800-123-4567."
+              ]
+            },
+            "languageCode": "en"
+          }
+        ]
+      },
+      "name": "a8b2e2a8-5b9f-4b7c-8b7c-2e2a8b7c2e2a"
+    }
+  ],
+  "eventHandlers": [
+    {
+      "event": "sys.no-match-default",
+      "triggerFulfillment": {
+        "messages": [
+          {
+            "text": {
+              "text": [
+                "I didn't get that. Can you say it again?"
+              ]
+            },
+            "languageCode": "en"
+          }
+        ]
+      },
+      "name": "9a5448b9-ec0c-4a6d-a6a5-dcf403eb286f"
+    },
+    {
+      "event": "sys.no-input-default",
+      "triggerFulfillment": {
+        "messages": [
+          {
+            "text": {
+              "text": [
+                "I didn't get that. Can you say it again?"
+              ]
+            },
+            "languageCode": "en"
+          }
+        ]
+      },
+      "name": "10e7aa74-f453-45a8-809e-87c12ee94f4d"
+    }
+  ],
+  "nluSettings": {
+    "modelType": "MODEL_TYPE_ADVANCED",
+    "classificationThreshold": 0.3
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "trainingPhrases": [
+    {
+      "parts": [{"text": "Do you have an API for developers?"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "API for developers"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    },
+    {
+      "parts": [{"text": "do you offer an API"}],
+      "repeatCount": 1,
+      "languageCode": "en"
+    }
+  ]
+}
