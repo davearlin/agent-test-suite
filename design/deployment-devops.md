@@ -643,12 +643,6 @@ graph TB
         SCOPE_GEMINI[generative-language.retriever]
     end
     
-    subgraph "Removed/Deprecated"
-        REMOVED_1[❌ GEMINI_MODEL - Models discovered dynamically]
-        REMOVED_2[❌ GOOGLE_APPLICATION_CREDENTIALS - ADC auto-detects]
-        REMOVED_3[❌ Service Account JSON Files - OAuth replaces]
-    end
-    
     USER --> GOOGLE_OAUTH
     GOOGLE_OAUTH --> USER_CREDS
     USER_CREDS --> JWT_TOKEN
