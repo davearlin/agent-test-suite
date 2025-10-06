@@ -33,9 +33,24 @@ async def list_test_runs(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """List test runs with optional filtering."""
+    """List test runs with optional filtering.
+    
+    NOTE: This endpoint intentionally does NOT load test_results or full dataset questions
+    to keep payloads small. Returns DatasetSummary instead of full Dataset.
+    """
+    from sqlalchemy.orm import noload, selectinload
+    from sqlalchemy import func
+    from app.models.schemas import DatasetSummary
+    
     # Join with User table to get creator information
-    query = db.query(TestRun).options(joinedload(TestRun.created_by))
+    # Load datasets but not their questions
+    query = db.query(TestRun).options(
+        joinedload(TestRun.created_by),
+        noload(TestRun.test_results),  # Don't load test results in list view
+        selectinload(TestRun.datasets).noload(Dataset.questions),  # Load datasets but not questions
+        selectinload(TestRun.datasets).joinedload(Dataset.owner),  # Load dataset owner for owner_name
+        noload(TestRun.dataset)  # Don't load legacy single dataset
+    )
     
     if dataset_id:
         query = query.filter(TestRun.dataset_id == dataset_id)
@@ -49,22 +64,78 @@ async def list_test_runs(
     
     test_runs = query.order_by(TestRun.created_at.desc()).offset(skip).limit(limit).all()
     
-    # Convert to schemas and manually populate user fields  
+    # Convert to schemas and manually populate user fields and dataset summaries
     result = []
     for test_run in test_runs:
         try:
-            # Use forgiving schema for reading existing data
-            test_run_dict = TestRunRead.model_validate(test_run).model_dump()
+            # Convert datasets to lightweight summaries FIRST (exclude questions to reduce response size)
+            dataset_summaries = []
+            if test_run.datasets:
+                for ds in test_run.datasets:
+                    # Get question count
+                    question_count = db.query(func.count(Question.id)).filter(
+                        Question.dataset_id == ds.id
+                    ).scalar() or 0
+                    
+                    dataset_summaries.append({
+                        'id': ds.id,
+                        'name': ds.name,
+                        'category': ds.category,
+                        'version': ds.version,
+                        'question_count': question_count,
+                        'created_at': ds.created_at,
+                        'owner_name': ds.owner.full_name if hasattr(ds, 'owner') and ds.owner else 'Unknown'
+                    })
+            
+            # Create a copy of test_run with converted datasets
+            # Use getattr with defaults to handle old test runs that may not have all fields
+            test_run_dict = {
+                'id': test_run.id,
+                'name': getattr(test_run, 'name', 'Unnamed Test'),
+                'description': getattr(test_run, 'description', None),
+                'project_id': getattr(test_run, 'project_id', None),
+                'agent_id': getattr(test_run, 'agent_id', None),
+                'agent_name': getattr(test_run, 'agent_name', ''),
+                'agent_display_name': getattr(test_run, 'agent_display_name', None),
+                'flow_name': getattr(test_run, 'flow_name', 'Default Start Flow'),
+                'flow_display_name': getattr(test_run, 'flow_display_name', None),
+                'page_name': getattr(test_run, 'page_name', 'Start Page'),
+                'page_display_name': getattr(test_run, 'page_display_name', None),
+                'environment': getattr(test_run, 'environment', 'draft'),
+                'playbook_id': getattr(test_run, 'playbook_id', None),
+                'playbook_display_name': getattr(test_run, 'playbook_display_name', None),
+                'session_parameters': getattr(test_run, 'session_parameters', None),
+                'pre_prompt_messages': getattr(test_run, 'pre_prompt_messages', None),
+                'post_prompt_messages': getattr(test_run, 'post_prompt_messages', None),
+                'enable_webhook': getattr(test_run, 'enable_webhook', True),
+                'evaluation_parameters': getattr(test_run, 'evaluation_parameters', None),
+                'llm_model_id': getattr(test_run, 'llm_model_id', None),
+                'evaluation_model_id': getattr(test_run, 'evaluation_model_id', ''),
+                'batch_size': getattr(test_run, 'batch_size', 10),
+                'created_at': test_run.created_at,
+                'created_by_id': test_run.created_by_id,
+                'status': test_run.status,
+                'total_questions': getattr(test_run, 'total_questions', 0),
+                'completed_questions': getattr(test_run, 'completed_questions', 0),
+                'average_score': getattr(test_run, 'average_score', None),
+                'started_at': getattr(test_run, 'started_at', None),
+                'completed_at': getattr(test_run, 'completed_at', None),
+                'datasets': dataset_summaries
+            }
+            
+            # Add user information
             if test_run.created_by:
                 test_run_dict['created_by_email'] = test_run.created_by.email
                 test_run_dict['created_by_name'] = test_run.created_by.full_name
             else:
                 test_run_dict['created_by_email'] = 'unknown@example.com'
                 test_run_dict['created_by_name'] = 'Unknown User'
+            
             result.append(TestRunRead(**test_run_dict))
         except Exception as e:
             # Log validation errors but don't fail the entire request
-            print(f"Warning: Could not validate test run {test_run.id}: {str(e)}")
+            import logging
+            logging.error(f"Warning: Could not validate test run {test_run.id}: {str(e)}")
             # Skip this test run rather than failing the entire request
             continue
     
@@ -261,9 +332,18 @@ async def get_test_run(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get a specific test run by ID."""
+    """Get a specific test run by ID.
+    
+    NOTE: This endpoint does NOT load test_results to keep payload manageable.
+    Use GET /tests/{test_run_id}/results with pagination to fetch test results.
+    """
+    from sqlalchemy.orm import noload
+    
     test_run = db.query(TestRun)\
-        .options(joinedload(TestRun.evaluation_config))\
+        .options(
+            joinedload(TestRun.evaluation_config),
+            noload(TestRun.test_results)  # Don't load all test results - use /results endpoint instead
+        )\
         .filter(TestRun.id == test_run_id)\
         .first()
     
@@ -387,11 +467,15 @@ async def delete_test_run(
 async def get_test_results(
     test_run_id: int,
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 1000,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get all results for a specific test run."""
+    """Get all results for a specific test run with pagination.
+    
+    Default limit is 1000 to handle most test runs in a single request while
+    still preventing issues with extremely large test runs (5000+ questions).
+    """
     test_run = db.query(TestRun).filter(TestRun.id == test_run_id).first()
     
     if not test_run:

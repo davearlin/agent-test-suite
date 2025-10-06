@@ -207,8 +207,14 @@ const TestRunDetailPage: React.FC = () => {
     
     try {
       setLoadingResults(true);
-      // Use apiService for consistent API calls
-      const resultsData = await apiService.getTestResults(parseInt(id));
+      // Use apiService with pagination to avoid loading huge payloads
+      // Load first batch of results (default page size: 1000)
+      // This handles most test runs in a single request while preventing
+      // issues with extremely large test runs (5000+ questions)
+      const resultsData = await apiService.getTestResults(parseInt(id), {
+        skip: 0,
+        limit: 1000
+      });
       setTestResults(resultsData);
       setLastResultCount(resultsData.length); // Track current result count
     } catch (error) {
@@ -224,9 +230,10 @@ const TestRunDetailPage: React.FC = () => {
     
     try {
       // Fetch only new results using skip parameter
+      // Use 1000 batch size to minimize number of requests needed
       const newResultsData = await apiService.getTestResults(parseInt(id), {
         skip: lastResultCount,
-        limit: 100 // Get up to 100 new results
+        limit: 1000 // Get up to 1000 new results per batch
       });
       
       if (newResultsData.length > 0) {
@@ -1327,15 +1334,29 @@ const TestRunDetailPage: React.FC = () => {
               </TableBody>
             </Table>
           </TableContainer>
-          <TablePagination
-            rowsPerPageOptions={[10, 25, 50, 100]}
-            component="div"
-            count={sortedResults.length}
-            rowsPerPage={rowsPerPage}
-            page={page}
-            onPageChange={handleChangePage}
-            onRowsPerPageChange={handleChangeRowsPerPage}
-          />
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
+            <TablePagination
+              rowsPerPageOptions={[10, 25, 50, 100]}
+              component="div"
+              count={sortedResults.length}
+              rowsPerPage={rowsPerPage}
+              page={page}
+              onPageChange={handleChangePage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
+            />
+            {/* Load More button for server-side pagination */}
+            {testRun && testResults.length < testRun.total_questions && (
+              <Button
+                variant="outlined"
+                onClick={loadNewTestResults}
+                disabled={loadingResults}
+                startIcon={loadingResults ? <CircularProgress size={16} /> : <AutorenewIcon />}
+                sx={{ mr: 2 }}
+              >
+                {loadingResults ? 'Loading...' : `Load More (${testResults.length} of ${testRun.total_questions})`}
+              </Button>
+            )}
+          </Box>
                 </>
               )}
             </>

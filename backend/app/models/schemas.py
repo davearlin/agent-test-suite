@@ -282,7 +282,11 @@ class TestRun(TestRunBase):
 
 
 class TestRunRead(TestRunBase):
-    """Lightweight schema for listing test runs without heavy nested data"""
+    """Lightweight schema for listing test runs without heavy nested data.
+    
+    Uses DatasetSummary instead of full Dataset to avoid loading all questions.
+    Intentionally excludes test_results to keep payload small.
+    """
     id: int
     created_at: datetime
     created_by_id: int  # Changed from owner_id to match database model
@@ -301,8 +305,8 @@ class TestRunRead(TestRunBase):
     created_by_email: Optional[str] = None
     created_by_name: Optional[str] = None
     
-    # Lightweight dataset info (just names, not full objects)
-    datasets: List[Dataset] = []
+    # Lightweight dataset info (summary only, not full dataset with questions)
+    datasets: List[DatasetSummary] = []
 
     model_config = ConfigDict(from_attributes=True)
 
