@@ -328,7 +328,7 @@ export default function DatasetsPage() {
         onClose={handleMenuClose}
       >
         <MenuItem onClick={() => {
-          if (selectedDataset) handleOpenDialog(selectedDataset);
+          if (selectedDataset) navigate(`/datasets/${selectedDataset.id}/edit`);
           handleMenuClose();
         }}>
           <EditIcon sx={{ mr: 1 }} />

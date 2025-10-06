@@ -148,7 +148,7 @@ const EditDatasetPage: React.FC = () => {
             rows={3}
           />
 
-          <FormControl fullWidth margin="normal" required>
+          <FormControl fullWidth margin="normal">
             <InputLabel>Category</InputLabel>
             <Select
               value={formData.category}
