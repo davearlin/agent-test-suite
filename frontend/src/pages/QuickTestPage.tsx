@@ -51,7 +51,7 @@ const QuickTestPage: React.FC = () => {
   const [selectedModelId, setSelectedModelId] = useState<string>('');
   const [prompt, setPrompt] = useState<string>('');
   const [sessionId, setSessionId] = useState<string>('');
-  const [sessionParameters, setSessionParameters] = useState<Record<string, string>>({ retirementPlaybookRole: 'employee' }); // Default to employee retirementPlaybookRole
+  const [sessionParameters, setSessionParameters] = useState<Record<string, string>>({});
   const [enableWebhook, setEnableWebhook] = useState<boolean>(true); // Default to enabled webhooks
   
   // State for pre/post prompt messages

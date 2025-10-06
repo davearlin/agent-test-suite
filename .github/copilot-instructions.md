@@ -55,7 +55,7 @@ The application is designed for Docker Compose but has network/SSL restrictions 
 
 #### Primary Method (Docker Compose with Hot Reload)
 ```bash
-# NEVER CANCEL: Full build takes 8-15 minutes. Set timeout to 20+ minutes.
+# NEVER CANCEL: Full build takes 1-3 minutes. Set timeout to 20+ minutes.
 docker compose build
 docker compose up -d
 
@@ -153,14 +153,14 @@ python -m uvicorn app.main:main --host 0.0.0.0 --port 8000 --reload
 ```
 
 ### Docker Build Process
-**NEVER CANCEL: Docker builds take 8-15 minutes in ideal conditions. Set timeout to 20+ minutes minimum.**
+**NEVER CANCEL: Docker builds take 1-3 minutes in ideal conditions. Set timeout to 20+ minutes minimum.**
 ```bash
-# Full build - NEVER CANCEL, takes 8-15 minutes
+# Full build - NEVER CANCEL, takes 1-3 minutes
 time docker compose build
 
 # Individual service builds  
-docker compose build backend  # Takes 5-8 minutes
-docker compose build frontend # Takes 3-5 minutes
+docker compose build backend  # Takes 1-2 minutes
+docker compose build frontend # Takes 1-2 minutes
 ```
 
 ## Validation and Testing
@@ -423,8 +423,8 @@ from app.core.migration_files.add_new_feature import upgrade as add_new_feature
 - **Application startup**: 1 minute
 
 ### Typical Actual Times
-- **Docker full build**: 8-15 minutes
-- **npm ci**: ~30 seconds
+- **Docker full build**: 1-3 minutes
+- **npm ci**: ~45 seconds
 - **npm run build**: ~25 seconds  
 - **pip install**: ~60 seconds
 - **Services startup**: ~10 seconds
