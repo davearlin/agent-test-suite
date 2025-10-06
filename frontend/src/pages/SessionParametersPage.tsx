@@ -312,7 +312,7 @@ const SessionParametersPage: React.FC = () => {
           <Typography variant="body1" color="text.secondary">
             Session Parameters allow you to define common parameter key-value pairs that users can quickly add
             when configuring Quick Tests or Test Runs. This eliminates the need to manually type frequently used parameters
-            like userType, retirementPlaybookRole, and other agent-specific configurations.
+            and other agent-specific configurations.
           </Typography>
         </CardContent>
       </Card>
@@ -439,7 +439,7 @@ const SessionParametersPage: React.FC = () => {
               value={formData.name}
               onChange={(e) => handleFormChange('name', e.target.value)}
               sx={{ mb: 2 }}
-              placeholder="e.g., User Type: Employee"
+              placeholder="e.g., Department: Sales"
               helperText="A descriptive name shown to users"
             />
             
@@ -449,7 +449,7 @@ const SessionParametersPage: React.FC = () => {
               value={formData.key}
               onChange={(e) => handleFormChange('key', e.target.value)}
               sx={{ mb: 2 }}
-              placeholder="e.g., userType"
+              placeholder="e.g., department"
               helperText="The session parameter key"
             />
             
@@ -459,7 +459,7 @@ const SessionParametersPage: React.FC = () => {
               value={formData.value}
               onChange={(e) => handleFormChange('value', e.target.value)}
               sx={{ mb: 2 }}
-              placeholder="e.g., employee"
+              placeholder="e.g., sales"
               helperText="The session parameter value"
             />
             

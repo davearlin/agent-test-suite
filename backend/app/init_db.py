@@ -8,6 +8,10 @@ from sqlalchemy.exc import OperationalError
 from app.core.config import settings
 from app.core.database import Base
 
+# CRITICAL: Import all models to register them with Base before calling create_all()
+# Without these imports, Base.metadata.create_all() will create NO tables
+from app import models  # This imports all model classes
+
 def wait_for_db(max_retries=60, retry_delay=3):
     """Wait for database to become available with retry logic (extended for Cloud Run IAM)."""
     from app.core.database import get_engine

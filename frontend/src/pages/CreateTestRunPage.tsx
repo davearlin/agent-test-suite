@@ -84,7 +84,7 @@ const CreateTestRunPage: React.FC<CreateTestRunPageProps> = () => {
   const [selectedModelId, setSelectedModelId] = useState<string>('');
   const [selectedEvaluationModelId, setSelectedEvaluationModelId] = useState<string>('');
   const [batchSize, setBatchSize] = useState<number>(10);
-  const [sessionParameters, setSessionParameters] = useState<Record<string, string>>({ retirementPlaybookRole: 'employee' }); // Default to employee retirementPlaybookRole
+  const [sessionParameters, setSessionParameters] = useState<Record<string, string>>({});
   const [enableWebhook, setEnableWebhook] = useState<boolean>(true);
   
   // State for pre/post prompt messages

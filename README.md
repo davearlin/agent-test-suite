@@ -68,7 +68,6 @@ A platform for testing Dialogflow CX agents with AI-powered evaluation, modern U
 - ✅ **Quick Test Preferences**: Project, agent, flow, page, playbook, model, and session parameters saved automatically
 - ✅ **Test Run Preferences**: Separate preference system for Create Test Run screen with all Dialogflow Configuration fields
 - ✅ **API-Based Storage**: RESTful endpoints for preference management with proper schema validation
-- ✅ **Default Session Parameters**: Pre-seeded with userType (employee/admin) and retirementPlaybookRole (employee/admin) options
 - ✅ **Duplicate Prevention**: Smart validation prevents duplicate session parameter keys in both frontend and backend
 - ✅ **Generic Configuration**: Flexible key-value session parameters for specialized agent behavior
 - ✅ **Type Safety**: Full TypeScript integration with proper schema alignment between frontend and backend

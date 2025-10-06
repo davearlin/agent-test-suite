@@ -29,6 +29,11 @@ class MigrationManager:
             from app.core.migration_files.make_evaluation_model_required import main as make_eval_required
         except ImportError:
             make_eval_required = None
+            
+        try:
+            from app.core.migration_files.seed_default_evaluation_parameters import upgrade as seed_eval_params
+        except ImportError:
+            seed_eval_params = None
         
         self.migrations = [
             {
@@ -159,6 +164,13 @@ class MigrationManager:
                 'type': 'function',
                 'handler': make_eval_required,
                 'timeout': 60  # 60 second timeout
+            },
+            {
+                'name': 'seed_default_evaluation_parameters',
+                'description': 'Seed default evaluation parameters (Similarity Score, Empathy Level, No-Match Detection)',
+                'type': 'function',
+                'handler': seed_eval_params,
+                'timeout': None  # No timeout
             },
             # Data migrations (simple SQL updates)
             {

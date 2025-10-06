@@ -366,14 +366,15 @@ The application supports flexible session parameters that can be passed to Dialo
 ```json
 {
   "session_parameters": {
-    "userType": "employee",
-    "environment": "prod",
     "department": "sales",
     "region": "northeast",
-    "customParam": "customValue"
+    "customParam": "customValue",
+    "anotherParam": "anotherValue"
   }
 }
 ```
+
+**Note**: Session parameters are completely customizable. Users define their own parameters via the Session Parameters Management UI. There are no hardcoded or default parameters.
 
 ### Database Schema
 - **TestRun.session_parameters**: JSON field storing key-value pairs for test execution
@@ -393,7 +394,7 @@ The application supports flexible session parameters that can be passed to Dialo
 
 ### Migration Strategy
 - Database migration from `user_type` string fields to `session_parameters` JSON fields
-- Backward compatibility: `{"userType": "employee"}` maintains previous functionality
+- User-defined parameters: All session parameters are now created and managed by users via the Session Parameters Management UI
 - Extensibility: Any new session parameters can be added without schema changes
 
 ## API Endpoints

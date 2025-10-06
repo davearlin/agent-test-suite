@@ -43,57 +43,8 @@ def upgrade():
                 CREATE INDEX idx_quick_add_parameters_sort_order ON quick_add_parameters(sort_order);
             """))
             
-            # Insert default parameters (migrating from hardcoded values)
-            connection.execute(text("""
-                INSERT INTO quick_add_parameters (name, key, value, description, sort_order, created_by_id)
-                SELECT 
-                    'User Type: Employee',
-                    'userType',
-                    'employee',
-                    'Set user type to employee',
-                    1,
-                    (SELECT id FROM users WHERE role = 'admin' LIMIT 1)
-                WHERE EXISTS (SELECT 1 FROM users WHERE role = 'admin');
-            """))
-            
-            connection.execute(text("""
-                INSERT INTO quick_add_parameters (name, key, value, description, sort_order, created_by_id)
-                SELECT 
-                    'User Type: Admin',
-                    'userType',
-                    'admin',
-                    'Set user type to admin',
-                    2,
-                    (SELECT id FROM users WHERE role = 'admin' LIMIT 1)
-                WHERE EXISTS (SELECT 1 FROM users WHERE role = 'admin');
-            """))
-            
-            connection.execute(text("""
-                INSERT INTO quick_add_parameters (name, key, value, description, sort_order, created_by_id)
-                SELECT 
-                    'Retirement Playbook Role: Employee',
-                    'retirementPlaybookRole',
-                    'employee',
-                    'Set retirement playbook role to employee',
-                    3,
-                    (SELECT id FROM users WHERE role = 'admin' LIMIT 1)
-                WHERE EXISTS (SELECT 1 FROM users WHERE role = 'admin');
-            """))
-            
-            connection.execute(text("""
-                INSERT INTO quick_add_parameters (name, key, value, description, sort_order, created_by_id)
-                SELECT 
-                    'Retirement Playbook Role: Admin',
-                    'retirementPlaybookRole',
-                    'admin',
-                    'Set retirement playbook role to admin',
-                    4,
-                    (SELECT id FROM users WHERE role = 'admin' LIMIT 1)
-                WHERE EXISTS (SELECT 1 FROM users WHERE role = 'admin');
-            """))
-            
             connection.commit()
-            print("✅ quick_add_parameters table created with default data")
+            print("✅ quick_add_parameters table created (no seed data - users manage via UI)")
         else:
             print("quick_add_parameters table already exists, skipping...")
 

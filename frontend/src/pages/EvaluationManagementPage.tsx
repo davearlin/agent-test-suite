@@ -57,7 +57,7 @@ const EvaluationManagementPage: React.FC = () => {
   const fetchParameters = async () => {
     try {
       setLoading(true);
-      const response = await apiService.getEvaluationParameters();
+      const response = await apiService.getEvaluationParameters(true); // Include inactive parameters for management
       // Ensure response is an array and filter out invalid entries
       const validParameters = Array.isArray(response) 
         ? response.filter(param => param && typeof param === 'object' && param.id)
