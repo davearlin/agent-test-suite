@@ -43,10 +43,6 @@ def upgrade():
                 CREATE INDEX idx_quick_add_parameters_sort_order ON quick_add_parameters(sort_order);
             """))
             
-            # Note: No default/seed parameters inserted - users create their own via Session Parameters Management UI
-            # Previous versions had hardcoded userType and retirementPlaybookRole parameters, but these were
-            # application-specific and not generic enough. Users now have full control via the UI.
-            
             connection.commit()
             print("✅ quick_add_parameters table created (no seed data - users manage via UI)")
         else:

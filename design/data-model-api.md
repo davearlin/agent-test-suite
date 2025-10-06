@@ -396,7 +396,6 @@ The application supports flexible session parameters that can be passed to Dialo
 - Database migration from `user_type` string fields to `session_parameters` JSON fields
 - User-defined parameters: All session parameters are now created and managed by users via the Session Parameters Management UI
 - Extensibility: Any new session parameters can be added without schema changes
-- No default parameters: The system no longer seeds hardcoded parameters like `userType` or `retirementPlaybookRole`
 
 ## API Endpoints
 
