@@ -504,6 +504,23 @@ class DialogflowService:
             _permission_cache[cache_key] = {"accessible": False, "timestamp": now, "ttl": _permission_cache_ttl}
             return False
         except Exception as e:
+            error_str = str(e).lower()
+            
+            # Handle gRPC metadata size errors - these occur when agents with datastores
+            # return large responses (grounding citations, etc.). The agent IS accessible,
+            # the response is just too large for gRPC's default metadata limit.
+            if "metadata size exceeds" in error_str or "received metadata size" in error_str:
+                print(f"✅ Agent accessible but has large metadata (datastore response): {agent_name}")
+                _permission_cache[cache_key] = {"accessible": True, "timestamp": now, "ttl": _permission_cache_ttl}
+                return True
+            
+            # Handle rate limiting errors - these indicate the agent IS accessible,
+            # just that we're being rate limited. Assume accessible.
+            if "429" in str(e) and "quota" in error_str:
+                print(f"⚠️ Rate limited checking agent access (assuming accessible): {agent_name}")
+                _permission_cache[cache_key] = {"accessible": True, "timestamp": now, "ttl": _permission_cache_ttl}
+                return True
+            
             # Other errors (network, etc.) - log but assume inaccessible to be safe
             print(f"⚠️ Error testing agent access for {agent_name}: {str(e)}")
             # Cache negative result for transient errors too
@@ -577,8 +594,13 @@ class DialogflowService:
         return 'unknown'
 
     async def _get_regional_sessions_client(self, location: str):
-        """Get a SessionsClient configured for the specified location."""
+        """Get a SessionsClient configured for the specified location with large metadata support."""
         try:
+            from google.cloud.dialogflowcx_v3beta1.services.sessions.transports import SessionsGrpcTransport
+            import grpc
+            from google.auth.transport import grpc as google_auth_grpc
+            from google.auth.transport.requests import Request
+            
             # Get user credentials using the correct TokenManager method
             user_token = TokenManager.get_valid_token(self.user, self.db)
             if not user_token:
@@ -589,16 +611,49 @@ class DialogflowService:
                 self.user.google_refresh_token
             )
             
-            # Create regional client options
-            if location == 'global':
-                # For global location, use the default endpoint
-                client_options = None
-            else:
-                # For regional locations, use regional endpoint
-                client_options = ClientOptions(api_endpoint=f"{location}-dialogflow.googleapis.com")
+            # gRPC channel options to handle large metadata from agents with datastores
+            # Agents with playbooks connected to datastores can return large grounding metadata
+            # (citations, sources, etc.) that can exceed the default 16KB limit
+            # We increase to 128KB to handle this metadata
+            grpc_options = [
+                ("grpc.max_metadata_size", 128 * 1024),  # 128KB for metadata
+                ("grpc.max_receive_message_length", 50 * 1024 * 1024),  # 50MB for messages
+            ]
             
-            # Create and return regional sessions client
-            return SessionsClient(credentials=credentials, client_options=client_options)
+            # Determine the endpoint based on location
+            if location == 'global':
+                api_endpoint = "dialogflow.googleapis.com"
+            else:
+                api_endpoint = f"{location}-dialogflow.googleapis.com"
+            
+            try:
+                # Create an authenticated gRPC channel with custom options for large metadata
+                grpc_channel = google_auth_grpc.secure_authorized_channel(
+                    credentials,
+                    Request(),
+                    f"{api_endpoint}:443",
+                    options=grpc_options
+                )
+                
+                # Create a custom transport with the authenticated channel
+                transport = SessionsGrpcTransport(
+                    host=api_endpoint,
+                    credentials=credentials,
+                    channel=grpc_channel
+                )
+                
+                # Create and return regional sessions client with the custom transport
+                return SessionsClient(transport=transport)
+            except Exception as transport_error:
+                # If transport creation fails, fall back to standard client
+                print(f"⚠️ Custom transport failed for {location}, using standard client: {str(transport_error)}")
+                client_options = ClientOptions(api_endpoint=api_endpoint) if location != 'global' else None
+                return SessionsClient(credentials=credentials, client_options=client_options)
+            
+        except Exception as e:
+            print(f"❌ Error creating regional sessions client for {location}: {str(e)}")
+            # Fallback to default sessions client
+            return self.sessions_client
             
         except Exception as e:
             print(f"❌ Error creating regional sessions client for {location}: {str(e)}")
