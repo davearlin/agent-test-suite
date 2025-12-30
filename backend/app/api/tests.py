@@ -623,13 +623,20 @@ async def test_integration(
         }
 
 
-@router.get("/{test_run_id}/export-csv")
-async def export_test_run_csv(
+@router.get("/{test_run_id}/export")
+async def export_test_run(
     test_run_id: int,
+    format: str = "csv",
+    timezone: str = "UTC",
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Export test run results to CSV format."""
+    """Export test run results to CSV or Excel format.
+    
+    Args:
+        format: Export format - 'csv' or 'excel' (default: csv)
+        timezone: IANA timezone for date formatting in Excel (e.g., 'America/New_York', 'Europe/London')
+    """
     # Get the test run
     test_run = db.query(TestRun).filter(TestRun.id == test_run_id).first()
     
@@ -658,19 +665,12 @@ async def export_test_run_csv(
             detail="No test results found for this test run"
         )
     
-    # Enhanced headers for multi-parameter evaluation
-    headers = [
-        'Question', 'Expected Answer', 'Actual Answer', 
-        'Overall Score (%)',
-        'Parameter 1 Name', 'Parameter 1 Score (%)', 'Parameter 1 Weight (%)', 'Parameter 1 Reasoning',
-        'Parameter 2 Name', 'Parameter 2 Score (%)', 'Parameter 2 Weight (%)', 'Parameter 2 Reasoning',
-        'Parameter 3 Name', 'Parameter 3 Score (%)', 'Parameter 3 Weight (%)', 'Parameter 3 Reasoning',
-        'Parameter 4 Name', 'Parameter 4 Score (%)', 'Parameter 4 Weight (%)', 'Parameter 4 Reasoning',
-        'Parameter 5 Name', 'Parameter 5 Score (%)', 'Parameter 5 Weight (%)', 'Parameter 5 Reasoning'
-    ]
+    # Generate filename base
+    safe_name = test_run.name.replace(' ', '_').lower()
+    safe_name = ''.join(c for c in safe_name if c.isalnum() or c in ('_', '-'))
     
-    csv_rows = [','.join(escape_csv_value(header) for header in headers)]
-    
+    # Prepare data rows
+    rows_data = []
     for result in test_results:
         # Get parameter scores sorted by parameter_id
         parameter_scores = sorted(result.parameter_scores, key=lambda x: x.parameter_id) if result.parameter_scores else []
@@ -697,16 +697,45 @@ async def export_test_run_csv(
             (f"Error: {result.error_message}" if result.error_message else "No response")
         )
         
-        # Base fields
+        row = {
+            'question': result.question.question_text if result.question else '',
+            'expected_answer': result.question.expected_answer if result.question else '',
+            'actual_answer': actual_answer,
+            'overall_score': overall_score,
+            'parameter_scores': parameter_scores
+        }
+        rows_data.append(row)
+    
+    if format.lower() == 'excel':
+        return _create_excel_export(test_run, rows_data, safe_name, timezone)
+    else:
+        return _create_csv_export(test_run, rows_data, safe_name)
+
+
+def _create_csv_export(test_run, rows_data, safe_name):
+    """Create CSV export response."""
+    headers = [
+        'Question', 'Expected Answer', 'Actual Answer', 
+        'Overall Score (%)',
+        'Parameter 1 Name', 'Parameter 1 Score (%)', 'Parameter 1 Weight (%)', 'Parameter 1 Reasoning',
+        'Parameter 2 Name', 'Parameter 2 Score (%)', 'Parameter 2 Weight (%)', 'Parameter 2 Reasoning',
+        'Parameter 3 Name', 'Parameter 3 Score (%)', 'Parameter 3 Weight (%)', 'Parameter 3 Reasoning',
+        'Parameter 4 Name', 'Parameter 4 Score (%)', 'Parameter 4 Weight (%)', 'Parameter 4 Reasoning',
+        'Parameter 5 Name', 'Parameter 5 Score (%)', 'Parameter 5 Weight (%)', 'Parameter 5 Reasoning'
+    ]
+    
+    csv_rows = [','.join(escape_csv_value(header) for header in headers)]
+    
+    for row in rows_data:
         base_fields = [
-            escape_csv_value(result.question.question_text if result.question else ''),
-            escape_csv_value(result.question.expected_answer if result.question else ''),
-            escape_csv_value(actual_answer),
-            str(overall_score)
+            escape_csv_value(row['question']),
+            escape_csv_value(row['expected_answer']),
+            escape_csv_value(row['actual_answer']),
+            str(row['overall_score'])
         ]
         
-        # Parameter breakdown fields (up to 5 parameters)
         parameter_fields = []
+        parameter_scores = row['parameter_scores']
         
         for i in range(5):
             if i < len(parameter_scores):
@@ -718,27 +747,285 @@ async def export_test_run_csv(
                     escape_csv_value(param_score.reasoning or '')
                 ])
             else:
-                # Empty fields for unused parameter slots
                 parameter_fields.extend(['', '', '', ''])
         
-        # Combine all fields
         row_data = base_fields + parameter_fields
         csv_rows.append(','.join(row_data))
     
-    # Create CSV content
     csv_content = '\n'.join(csv_rows)
-    
-    # Generate filename
-    safe_name = test_run.name.replace(' ', '_').lower()
-    safe_name = ''.join(c for c in safe_name if c.isalnum() or c in ('_', '-'))
     filename = f"test-run-{test_run.id}-{safe_name}-results.csv"
     
-    # Return CSV response
     return Response(
         content=csv_content,
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
+
+
+def _create_excel_export(test_run, rows_data, safe_name, timezone: str = "UTC"):
+    """Create professionally styled Excel export response."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Fill, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    from io import BytesIO
+    from zoneinfo import ZoneInfo
+    from datetime import datetime
+    
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Test Results"
+    
+    # Define styles
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+    header_fill = PatternFill(start_color="2E4057", end_color="2E4057", fill_type="solid")
+    header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    
+    # Alternating row colors
+    row_fill_light = PatternFill(start_color="F8F9FA", end_color="F8F9FA", fill_type="solid")
+    row_fill_white = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
+    
+    # Border style
+    thin_border = Border(
+        left=Side(style='thin', color='E0E0E0'),
+        right=Side(style='thin', color='E0E0E0'),
+        top=Side(style='thin', color='E0E0E0'),
+        bottom=Side(style='thin', color='E0E0E0')
+    )
+    
+    # Score color fills (red -> yellow -> green gradient)
+    def get_score_fill(score):
+        """Get fill color based on score (0-100)."""
+        if score >= 80:
+            return PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")  # Green
+        elif score >= 60:
+            return PatternFill(start_color="D4EDBC", end_color="D4EDBC", fill_type="solid")  # Light green
+        elif score >= 40:
+            return PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")  # Yellow
+        elif score >= 20:
+            return PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")  # Light red
+        else:
+            return PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")  # Red
+    
+    def get_score_font(score):
+        """Get font color based on score."""
+        if score >= 60:
+            return Font(bold=True, color="006100")  # Dark green
+        elif score >= 40:
+            return Font(bold=True, color="9C5700")  # Dark yellow/brown
+        else:
+            return Font(bold=True, color="9C0006")  # Dark red
+    
+    # Headers
+    headers = [
+        'Question', 'Expected Answer', 'Actual Answer', 
+        'Overall Score (%)',
+        'Parameter 1 Name', 'Parameter 1 Score (%)', 'Parameter 1 Weight (%)', 'Parameter 1 Reasoning',
+        'Parameter 2 Name', 'Parameter 2 Score (%)', 'Parameter 2 Weight (%)', 'Parameter 2 Reasoning',
+        'Parameter 3 Name', 'Parameter 3 Score (%)', 'Parameter 3 Weight (%)', 'Parameter 3 Reasoning',
+        'Parameter 4 Name', 'Parameter 4 Score (%)', 'Parameter 4 Weight (%)', 'Parameter 4 Reasoning',
+        'Parameter 5 Name', 'Parameter 5 Score (%)', 'Parameter 5 Weight (%)', 'Parameter 5 Reasoning'
+    ]
+    
+    # Write headers
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_alignment
+        cell.border = thin_border
+    
+    # Write data rows
+    for row_idx, row in enumerate(rows_data, 2):
+        # Determine row fill (alternating)
+        row_fill = row_fill_light if row_idx % 2 == 0 else row_fill_white
+        
+        # Base fields
+        ws.cell(row=row_idx, column=1, value=row['question'])
+        ws.cell(row=row_idx, column=2, value=row['expected_answer'])
+        ws.cell(row=row_idx, column=3, value=row['actual_answer'])
+        
+        # Overall score with color coding
+        overall_score = row['overall_score']
+        score_cell = ws.cell(row=row_idx, column=4, value=overall_score)
+        score_cell.fill = get_score_fill(overall_score)
+        score_cell.font = get_score_font(overall_score)
+        score_cell.alignment = Alignment(horizontal="center")
+        
+        # Parameter scores
+        parameter_scores = row['parameter_scores']
+        col_offset = 5
+        
+        for i in range(5):
+            base_col = col_offset + (i * 4)
+            if i < len(parameter_scores):
+                param_score = parameter_scores[i]
+                ws.cell(row=row_idx, column=base_col, value=param_score.parameter.name if param_score.parameter else f'Parameter {param_score.parameter_id}')
+                
+                # Parameter score with color coding
+                param_score_val = param_score.score or 0
+                param_score_cell = ws.cell(row=row_idx, column=base_col + 1, value=param_score_val)
+                param_score_cell.fill = get_score_fill(param_score_val)
+                param_score_cell.font = get_score_font(param_score_val)
+                param_score_cell.alignment = Alignment(horizontal="center")
+                
+                ws.cell(row=row_idx, column=base_col + 2, value=param_score.weight_used or 0)
+                ws.cell(row=row_idx, column=base_col + 3, value=param_score.reasoning or '')
+        
+        # Apply row fill and borders to all cells in row
+        for col in range(1, len(headers) + 1):
+            cell = ws.cell(row=row_idx, column=col)
+            if col not in [4] + [col_offset + (i * 4) + 1 for i in range(5)]:  # Don't override score colors
+                cell.fill = row_fill
+            cell.border = thin_border
+            cell.alignment = Alignment(vertical="top", wrap_text=True)
+    
+    # Set column widths
+    column_widths = {
+        1: 40,   # Question
+        2: 40,   # Expected Answer
+        3: 40,   # Actual Answer
+        4: 15,   # Overall Score
+    }
+    # Parameter columns
+    for i in range(5):
+        base = 5 + (i * 4)
+        column_widths[base] = 20      # Name
+        column_widths[base + 1] = 12  # Score
+        column_widths[base + 2] = 12  # Weight
+        column_widths[base + 3] = 35  # Reasoning
+    
+    for col, width in column_widths.items():
+        ws.column_dimensions[get_column_letter(col)].width = width
+    
+    # Freeze header row
+    ws.freeze_panes = 'A2'
+    
+    # Set row height for header
+    ws.row_dimensions[1].height = 30
+    
+    # Create summary sheet
+    summary_ws = wb.create_sheet(title="Summary")
+    
+    # Summary styling
+    summary_header_fill = PatternFill(start_color="1E3A5F", end_color="1E3A5F", fill_type="solid")
+    summary_header_font = Font(bold=True, color="FFFFFF", size=12)
+    
+    # Summary data
+    total_questions = len(rows_data)
+    avg_score = sum(r['overall_score'] for r in rows_data) / total_questions if total_questions > 0 else 0
+    high_scores = sum(1 for r in rows_data if r['overall_score'] >= 80)
+    medium_scores = sum(1 for r in rows_data if 40 <= r['overall_score'] < 80)
+    low_scores = sum(1 for r in rows_data if r['overall_score'] < 40)
+    
+    # Format date with timezone
+    if test_run.created_at:
+        try:
+            # Convert to user's timezone
+            user_tz = ZoneInfo(timezone)
+            # Ensure created_at is timezone-aware (assume UTC if naive)
+            if test_run.created_at.tzinfo is None:
+                utc_time = test_run.created_at.replace(tzinfo=ZoneInfo("UTC"))
+            else:
+                utc_time = test_run.created_at
+            local_time = utc_time.astimezone(user_tz)
+            test_date = local_time.strftime("%Y-%m-%d %H:%M:%S %Z")
+        except Exception:
+            # Fallback to UTC if timezone is invalid
+            test_date = test_run.created_at.strftime("%Y-%m-%d %H:%M:%S UTC")
+    else:
+        test_date = "N/A"
+    
+    # Determine flow or playbook display
+    if test_run.playbook_id:
+        flow_or_playbook_label = "Playbook"
+        flow_or_playbook_value = test_run.playbook_display_name or test_run.playbook_id or "N/A"
+    else:
+        flow_or_playbook_label = "Start Flow"
+        flow_or_playbook_value = test_run.flow_display_name or test_run.flow_name or "Default Start Flow"
+    
+    # Format pre/post prompt messages - show actual content
+    pre_prompts = test_run.pre_prompt_messages or []
+    post_prompts = test_run.post_prompt_messages or []
+    
+    # Extract message content from the message objects
+    def format_messages(messages):
+        if not messages:
+            return "None"
+        message_texts = []
+        for i, msg in enumerate(messages, 1):
+            if isinstance(msg, dict):
+                text = msg.get('text', msg.get('content', str(msg)))
+            else:
+                text = str(msg)
+            message_texts.append(f"{i}. {text}")
+        return "\n".join(message_texts)
+    
+    pre_prompt_display = format_messages(pre_prompts)
+    post_prompt_display = format_messages(post_prompts)
+    
+    summary_data = [
+        ("Test Run Summary", ""),
+        ("", ""),
+        ("Test Run Name", test_run.name),
+        ("Date", test_date),
+        ("", ""),
+        ("Configuration", ""),
+        ("Agent", test_run.agent_display_name or test_run.agent_name or "N/A"),
+        (flow_or_playbook_label, flow_or_playbook_value),
+        ("Evaluation Model", test_run.evaluation_model_id or "N/A"),
+        ("Batch Size", test_run.batch_size or 10),
+        ("Webhooks", "Enabled" if test_run.enable_webhook else "Disabled"),
+        ("Pre-Prompt Messages", pre_prompt_display),
+        ("Post-Prompt Messages", post_prompt_display),
+        ("", ""),
+        ("Results Summary", ""),
+        ("Total Questions", total_questions),
+        ("Average Score", f"{avg_score:.1f}%"),
+        ("", ""),
+        ("Score Distribution", ""),
+        ("High (≥80%)", f"{high_scores} ({high_scores/total_questions*100:.1f}%)" if total_questions > 0 else "0"),
+        ("Medium (40-79%)", f"{medium_scores} ({medium_scores/total_questions*100:.1f}%)" if total_questions > 0 else "0"),
+        ("Low (<40%)", f"{low_scores} ({low_scores/total_questions*100:.1f}%)" if total_questions > 0 else "0"),
+    ]
+    
+    for row_idx, (label, value) in enumerate(summary_data, 1):
+        label_cell = summary_ws.cell(row=row_idx, column=1, value=label)
+        value_cell = summary_ws.cell(row=row_idx, column=2, value=value)
+        
+        if row_idx == 1:
+            label_cell.font = Font(bold=True, size=14, color="1E3A5F")
+        elif label in ["Configuration", "Results Summary", "Score Distribution"]:
+            label_cell.font = Font(bold=True, size=11)
+        elif label == "Average Score":
+            value_cell.fill = get_score_fill(avg_score)
+            value_cell.font = get_score_font(avg_score)
+    
+    summary_ws.column_dimensions['A'].width = 25
+    summary_ws.column_dimensions['B'].width = 40
+    
+    # Save to BytesIO
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    filename = f"test-run-{test_run.id}-{safe_name}-results.xlsx"
+    
+    return Response(
+        content=output.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+# Keep old endpoint for backward compatibility
+@router.get("/{test_run_id}/export-csv")
+async def export_test_run_csv(
+    test_run_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Export test run results to CSV format (legacy endpoint - use /export?format=csv instead)."""
+    return await export_test_run(test_run_id, format="csv", db=db, current_user=current_user)
 
 
 @router.get("/models/status")

@@ -372,19 +372,28 @@ const TestRunDetailPage: React.FC = () => {
     }));
   };
 
-  // CSV Export function for this test run's results
-  const exportTestRunToCSV = async () => {
+  // Export menu state
+  const [exportMenuAnchor, setExportMenuAnchor] = useState<null | HTMLElement>(null);
+
+  // Export function for this test run's results
+  const exportTestRun = async (format: 'csv' | 'excel') => {
     try {
       if (!testRun) {
         alert('Test run data not available.');
         return;
       }
 
-      await apiService.exportTestRunToCSV(testRun.id);
+      await apiService.exportTestRun(testRun.id, format);
+      setExportMenuAnchor(null);
     } catch (error) {
-      console.error('Error exporting test run to CSV:', error);
-      alert('Failed to export test run. Please try again.');
+      console.error(`Error exporting test run to ${format.toUpperCase()}:`, error);
+      alert(`Failed to export test run to ${format.toUpperCase()}. Please try again.`);
     }
+  };
+
+  // Legacy function for backward compatibility
+  const exportTestRunToCSV = async () => {
+    await exportTestRun('csv');
   };
 
   const filteredResults = React.useMemo(() => {
@@ -602,13 +611,26 @@ const TestRunDetailPage: React.FC = () => {
             </IconButton>
           </Tooltip>
         )}
-        <IconButton 
-          onClick={exportTestRunToCSV}
-          sx={{ mr: 1 }}
-          title="Export test results to CSV"
+        <Tooltip title="Export Results">
+          <IconButton 
+            onClick={(e) => setExportMenuAnchor(e.currentTarget)}
+            sx={{ mr: 1 }}
+          >
+            <GetAppIcon />
+          </IconButton>
+        </Tooltip>
+        <Menu
+          anchorEl={exportMenuAnchor}
+          open={Boolean(exportMenuAnchor)}
+          onClose={() => setExportMenuAnchor(null)}
         >
-          <GetAppIcon />
-        </IconButton>
+          <MenuItem onClick={() => exportTestRun('csv')}>
+            Export to CSV
+          </MenuItem>
+          <MenuItem onClick={() => exportTestRun('excel')}>
+            Export to Excel
+          </MenuItem>
+        </Menu>
         <IconButton onClick={() => { loadTestResults(); }}>
           <RefreshIcon />
         </IconButton>

@@ -280,14 +280,27 @@ class ApiService {
   }
 
   async exportTestRunToCSV(testRunId: number): Promise<void> {
+    return this.exportTestRun(testRunId, 'csv');
+  }
+
+  async exportTestRunToExcel(testRunId: number): Promise<void> {
+    return this.exportTestRun(testRunId, 'excel');
+  }
+
+  async exportTestRun(testRunId: number, format: 'csv' | 'excel' = 'csv'): Promise<void> {
     try {
-      const response = await this.api.get(`/api/v1/tests/${testRunId}/export-csv`, {
+      // Get user's timezone for Excel export
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      
+      const response = await this.api.get(`/api/v1/tests/${testRunId}/export`, {
+        params: { format, timezone },
         responseType: 'blob', // Important for file downloads
       });
 
       // Extract filename from Content-Disposition header if available
       const contentDisposition = response.headers['content-disposition'];
-      let filename = `test-run-${testRunId}-results.csv`;
+      const extension = format === 'excel' ? 'xlsx' : 'csv';
+      let filename = `test-run-${testRunId}-results.${extension}`;
       
       if (contentDisposition) {
         const filenameMatch = contentDisposition.match(/filename=([^;]+)/);
@@ -297,7 +310,10 @@ class ApiService {
       }
 
       // Create download link
-      const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+      const mimeType = format === 'excel' 
+        ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        : 'text/csv;charset=utf-8;';
+      const blob = new Blob([response.data], { type: mimeType });
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
       
@@ -312,8 +328,8 @@ class ApiService {
       // Clean up
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Error exporting test run to CSV:', error);
-      throw new Error('Failed to export test run to CSV. Please try again.');
+      console.error(`Error exporting test run to ${format.toUpperCase()}:`, error);
+      throw new Error(`Failed to export test run to ${format.toUpperCase()}. Please try again.`);
     }
   }
 

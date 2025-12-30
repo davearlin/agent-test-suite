@@ -24,7 +24,9 @@ import {
   Checkbox,
   FormControlLabel,
   Stack,
-  Switch
+  Switch,
+  Menu,
+  MenuItem
 } from '@mui/material';
 import {
   Visibility as ViewIcon,
@@ -74,6 +76,10 @@ const TestRunsPage: React.FC = () => {
 
   // Auto-refresh state
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+
+  // Export menu state
+  const [exportMenuAnchor, setExportMenuAnchor] = useState<null | HTMLElement>(null);
+  const [exportTestRunId, setExportTestRunId] = useState<number | null>(null);
 
   // Use ref to get current testRuns in interval callback
   const testRunsRef = useRef(testRuns);
@@ -208,14 +214,31 @@ const TestRunsPage: React.FC = () => {
     return 0;
   };
 
-  // CSV Export function for individual test run
-  const exportTestRunToCSV = async (testRun: TestRun) => {
+  // Export menu handlers
+  const handleExportClick = (event: React.MouseEvent<HTMLElement>, testRunId: number) => {
+    setExportMenuAnchor(event.currentTarget);
+    setExportTestRunId(testRunId);
+  };
+
+  const handleExportClose = () => {
+    setExportMenuAnchor(null);
+    setExportTestRunId(null);
+  };
+
+  // Export function for individual test run
+  const exportTestRun = async (format: 'csv' | 'excel') => {
+    if (!exportTestRunId) return;
     try {
-      await apiService.exportTestRunToCSV(testRun.id);
+      if (format === 'excel') {
+        await apiService.exportTestRunToExcel(exportTestRunId);
+      } else {
+        await apiService.exportTestRunToCSV(exportTestRunId);
+      }
     } catch (error) {
-      console.error('Error exporting test run to CSV:', error);
+      console.error(`Error exporting test run to ${format.toUpperCase()}:`, error);
       alert('Failed to export test run. Please try again.');
     }
+    handleExportClose();
   };
 
   if (loading) {
@@ -406,11 +429,11 @@ const TestRunsPage: React.FC = () => {
                         </IconButton>
                       </Tooltip>
                       {testRun.status.toLowerCase() === 'completed' && (
-                        <Tooltip title="Export Results to CSV">
+                        <Tooltip title="Export Results">
                           <IconButton
                             size="small"
                             color="primary"
-                            onClick={() => exportTestRunToCSV(testRun)}
+                            onClick={(e) => handleExportClick(e, testRun.id)}
                           >
                             <GetAppIcon />
                           </IconButton>
@@ -515,6 +538,20 @@ const TestRunsPage: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Export Format Menu */}
+      <Menu
+        anchorEl={exportMenuAnchor}
+        open={Boolean(exportMenuAnchor)}
+        onClose={handleExportClose}
+      >
+        <MenuItem onClick={() => exportTestRun('csv')}>
+          Export to CSV
+        </MenuItem>
+        <MenuItem onClick={() => exportTestRun('excel')}>
+          Export to Excel
+        </MenuItem>
+      </Menu>
     </Box>
   );
 };
