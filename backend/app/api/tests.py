@@ -661,26 +661,33 @@ async def export_test_run_csv(
     # Enhanced headers for multi-parameter evaluation
     headers = [
         'Question', 'Expected Answer', 'Actual Answer', 
-        'Overall Score (%)', 'Score Type', 'Execution Time (ms)',
+        'Overall Score (%)',
         'Parameter 1 Name', 'Parameter 1 Score (%)', 'Parameter 1 Weight (%)', 'Parameter 1 Reasoning',
         'Parameter 2 Name', 'Parameter 2 Score (%)', 'Parameter 2 Weight (%)', 'Parameter 2 Reasoning',
         'Parameter 3 Name', 'Parameter 3 Score (%)', 'Parameter 3 Weight (%)', 'Parameter 3 Reasoning',
         'Parameter 4 Name', 'Parameter 4 Score (%)', 'Parameter 4 Weight (%)', 'Parameter 4 Reasoning',
-        'Parameter 5 Name', 'Parameter 5 Score (%)', 'Parameter 5 Weight (%)', 'Parameter 5 Reasoning',
-        'Legacy Evaluation Reasoning'
+        'Parameter 5 Name', 'Parameter 5 Score (%)', 'Parameter 5 Weight (%)', 'Parameter 5 Reasoning'
     ]
     
     csv_rows = [','.join(escape_csv_value(header) for header in headers)]
     
     for result in test_results:
-        # Determine overall score and type
-        overall_score = result.overall_score if result.overall_score is not None else (
-            result.similarity_score if result.similarity_score is not None else 'N/A'
-        )
+        # Get parameter scores sorted by parameter_id
+        parameter_scores = sorted(result.parameter_scores, key=lambda x: x.parameter_id) if result.parameter_scores else []
         
-        score_type = 'Multi-Parameter' if result.overall_score is not None else (
-            'Legacy Similarity' if result.similarity_score is not None else 'N/A'
-        )
+        # Calculate overall score as weighted average from parameter scores (same as frontend)
+        if parameter_scores:
+            total_weight = sum(ps.weight_used or 0 for ps in parameter_scores)
+            if total_weight > 0:
+                weighted_sum = sum((ps.score or 0) * (ps.weight_used or 0) for ps in parameter_scores)
+                overall_score = round(weighted_sum / total_weight, 1)
+            else:
+                overall_score = 0
+        else:
+            # Fallback to stored overall_score or similarity_score if no parameter scores
+            overall_score = result.overall_score if result.overall_score is not None else (
+                result.similarity_score if result.similarity_score is not None else 0
+            )
         
         # Get actual answer from various response fields
         actual_answer = (
@@ -695,14 +702,11 @@ async def export_test_run_csv(
             escape_csv_value(result.question.question_text if result.question else ''),
             escape_csv_value(result.question.expected_answer if result.question else ''),
             escape_csv_value(actual_answer),
-            str(overall_score),
-            score_type,
-            str(result.execution_time_ms or 0)
+            str(overall_score)
         ]
         
         # Parameter breakdown fields (up to 5 parameters)
         parameter_fields = []
-        parameter_scores = sorted(result.parameter_scores, key=lambda x: x.parameter_id) if result.parameter_scores else []
         
         for i in range(5):
             if i < len(parameter_scores):
@@ -717,11 +721,8 @@ async def export_test_run_csv(
                 # Empty fields for unused parameter slots
                 parameter_fields.extend(['', '', '', ''])
         
-        # Legacy reasoning
-        legacy_reasoning = escape_csv_value(result.evaluation_reasoning or '')
-        
         # Combine all fields
-        row_data = base_fields + parameter_fields + [legacy_reasoning]
+        row_data = base_fields + parameter_fields
         csv_rows.append(','.join(row_data))
     
     # Create CSV content
