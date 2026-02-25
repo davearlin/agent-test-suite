@@ -374,6 +374,8 @@ const EditEvaluationParameterPage: React.FC = () => {
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             placeholder="e.g., Empathy Level, Similarity Score"
+            helperText={`${formData.name.trim().length}/3 characters minimum`}
+            error={formData.name.trim().length > 0 && formData.name.trim().length < 3}
             fullWidth
             required
           />
@@ -382,7 +384,9 @@ const EditEvaluationParameterPage: React.FC = () => {
             label="Description"
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            placeholder="Describe what this parameter evaluates"
+            placeholder="Describe what this evaluator measures"
+            helperText={`${formData.description.trim().length}/10 characters minimum`}
+            error={formData.description.trim().length > 0 && formData.description.trim().length < 10}
             multiline
             rows={3}
             fullWidth
@@ -412,7 +416,8 @@ const EditEvaluationParameterPage: React.FC = () => {
           value={evaluationTask}
           onChange={(e) => setEvaluationTask(e.target.value)}
           placeholder="Describe what this evaluation parameter should assess (e.g., 'Evaluate how empathetic and understanding the actual response is')"
-          helperText="Describe the specific aspect of the response you want to evaluate"
+          helperText={`${evaluationTask.trim().length}/10 characters minimum — describe the specific aspect of the response to evaluate`}
+          error={evaluationTask.trim().length > 0 && evaluationTask.trim().length < 10}
           multiline
           rows={6}
           fullWidth
