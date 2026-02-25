@@ -206,9 +206,10 @@ const EditEvaluationParameterPage: React.FC = () => {
 
       const promptTemplate = buildEvaluationPrompt(evaluationTask, scoringGuidelines);
       
+      const baseURL = import.meta.env.VITE_API_BASE_URL || '';
       const url = isCreateMode 
-        ? '/api/v1/evaluation/parameters'
-        : `/api/v1/evaluation/parameters/${id}`;
+        ? `${baseURL}/api/v1/evaluation/parameters`
+        : `${baseURL}/api/v1/evaluation/parameters/${id}`;
       
       const method = isCreateMode ? 'POST' : 'PUT';
 
