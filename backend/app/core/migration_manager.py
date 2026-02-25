@@ -181,6 +181,21 @@ class MigrationManager:
                     "UPDATE test_runs SET total_questions = 0 WHERE total_questions IS NULL",
                     "UPDATE test_runs SET completed_questions = 0 WHERE completed_questions IS NULL"
                 ]
+            },
+            {
+                'name': 'add_unique_evaluation_parameter_name',
+                'description': 'Add unique constraint on evaluation_parameters.name (deduplicate first)',
+                'type': 'data',
+                'sql': [
+                    # First deduplicate: keep the lowest-id row for each name, delete others
+                    """DELETE FROM evaluation_parameters
+                       WHERE id NOT IN (
+                         SELECT MIN(id) FROM evaluation_parameters GROUP BY name
+                       )""",
+                    # Then add the unique index (IF NOT EXISTS is not supported for constraints,
+                    # so we use CREATE UNIQUE INDEX which is idempotent with IF NOT EXISTS)
+                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_evaluation_parameters_name ON evaluation_parameters (name)"
+                ]
             }
         ]
     

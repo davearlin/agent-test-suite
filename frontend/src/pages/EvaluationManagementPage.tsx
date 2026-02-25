@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -17,12 +17,20 @@ import {
   DialogContent,
   DialogActions,
   Button,
+  ButtonGroup,
   Alert,
   Tooltip,
   Checkbox,
   FormControlLabel,
   FormGroup,
   Snackbar,
+  Collapse,
+  Fade,
+  Popper,
+  Grow,
+  MenuItem,
+  MenuList,
+  ClickAwayListener,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -30,6 +38,13 @@ import {
   Add,
   Upload as UploadIcon,
   GetApp as ExportIcon,
+  HelpOutline as HelpIcon,
+  Close as CloseIcon,
+  Psychology as PsychologyIcon,
+  TuneRounded as TuneIcon,
+  BarChart as ChartIcon,
+  PlaylistAddCheck as ChecklistIcon,
+  ArrowDropDown as ArrowDropDownIcon,
 } from '@mui/icons-material';
 import { apiService } from '../services/api';
 import { EvaluationParameter } from '../types';
@@ -49,6 +64,9 @@ const EvaluationManagementPage: React.FC = () => {
     severity: 'success'
   });
   const [parameterToDelete, setParameterToDelete] = useState<EvaluationParameter | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const addMenuAnchorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchParameters();
@@ -148,6 +166,38 @@ const EvaluationManagementPage: React.FC = () => {
     }
   };
 
+  const handleExportSingleParameter = async (parameter: EvaluationParameter) => {
+    try {
+      const token = requireAccessToken();
+      const baseURL = import.meta.env.VITE_API_BASE_URL || '';
+      const response = await fetch(`${baseURL}/api/v1/evaluation/parameters/export/${parameter.id}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) throw new Error('Failed to export evaluation parameter');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const safeName = (parameter.name || 'parameter').replace(/[^a-zA-Z0-9_-]/g, '_');
+      link.setAttribute('download', `evaluation_parameter_${safeName}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      showSnackbar(`Exported "${parameter.name}" successfully`, 'success');
+    } catch (error) {
+      console.error('Failed to export evaluation parameter:', error);
+      showSnackbar('Failed to export evaluation parameter', 'error');
+    }
+  };
+
   const handleImportParameters = async () => {
     if (!importFile) {
       showSnackbar('Please select a file to import', 'error');
@@ -198,33 +248,205 @@ const EvaluationManagementPage: React.FC = () => {
   return (
     <Box>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-        <Typography variant="h4" component="h1">
-          Evaluation Management
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            variant="outlined"
-            startIcon={<ExportIcon />}
-            onClick={handleExportParameters}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Typography variant="h4" component="h1">
+            Evaluation Management
+          </Typography>
+          <IconButton
+            onClick={() => setShowHelp(!showHelp)}
+            size="small"
+            sx={{
+              color: showHelp ? '#90caf9' : '#777',
+              backgroundColor: showHelp ? 'rgba(25, 118, 210, 0.12)' : 'transparent',
+              '&:hover': {
+                color: '#90caf9',
+                backgroundColor: 'rgba(25, 118, 210, 0.08)',
+              },
+              transition: 'all 0.2s',
+            }}
           >
-            Export CSV
-          </Button>
+            <HelpIcon />
+          </IconButton>
+        </Box>
+        <ButtonGroup variant="contained" ref={addMenuAnchorRef}>
           <Button
-            variant="outlined"
-            startIcon={<UploadIcon />}
-            onClick={() => setImportDialogOpen(true)}
-          >
-            Import CSV
-          </Button>
-          <Button
-            variant="contained"
             startIcon={<Add />}
             onClick={handleCreateParameter}
           >
-            Add Parameter
+            Add Evaluator
           </Button>
-        </Box>
+          <Button
+            size="small"
+            onClick={() => setAddMenuOpen((prev) => !prev)}
+            sx={{ px: 0.5 }}
+          >
+            <ArrowDropDownIcon />
+          </Button>
+        </ButtonGroup>
+        <Popper
+          open={addMenuOpen}
+          anchorEl={addMenuAnchorRef.current}
+          transition
+          disablePortal
+          placement="bottom-end"
+          sx={{ zIndex: 1300 }}
+        >
+          {({ TransitionProps }) => (
+            <Grow {...TransitionProps}>
+              <Paper sx={{ mt: 0.5, minWidth: 200, bgcolor: '#2a2a2a', border: '1px solid #444' }}>
+                <ClickAwayListener onClickAway={() => setAddMenuOpen(false)}>
+                  <MenuList dense>
+                    <MenuItem onClick={() => { handleCreateParameter(); setAddMenuOpen(false); }}>
+                      <Add sx={{ mr: 1, fontSize: '1.1rem', color: '#90caf9' }} /> Create New
+                    </MenuItem>
+                    <MenuItem onClick={() => { setImportDialogOpen(true); setAddMenuOpen(false); }}>
+                      <UploadIcon sx={{ mr: 1, fontSize: '1.1rem', color: '#66bb6a' }} /> Import from CSV
+                    </MenuItem>
+                  </MenuList>
+                </ClickAwayListener>
+              </Paper>
+            </Grow>
+          )}
+        </Popper>
       </Box>
+
+      {/* In-Context Help Banner */}
+      <Collapse in={showHelp}>
+        <Fade in={showHelp} timeout={400}>
+          <Paper
+            elevation={0}
+            sx={{
+              mb: 3,
+              overflow: 'hidden',
+              border: '1px solid rgba(25, 118, 210, 0.25)',
+              borderRadius: 2,
+              background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.06) 0%, rgba(102, 187, 106, 0.04) 100%)',
+            }}
+          >
+            {/* Header */}
+            <Box sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              px: 3,
+              py: 1.5,
+              borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+              background: 'linear-gradient(90deg, rgba(25, 118, 210, 0.10) 0%, rgba(102, 187, 106, 0.06) 100%)',
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <PsychologyIcon sx={{ color: '#90caf9', fontSize: '1.3rem' }} />
+                <Typography variant="subtitle1" fontWeight={600} sx={{ color: '#e3f2fd' }}>
+                  What Are Evaluation Parameters?
+                </Typography>
+              </Box>
+              <IconButton size="small" onClick={() => setShowHelp(false)} sx={{ color: '#999' }}>
+                <CloseIcon fontSize="small" />
+              </IconButton>
+            </Box>
+
+            <Box sx={{ p: 3 }}>
+              <Typography variant="body2" sx={{ color: '#ccc', lineHeight: 1.7, mb: 2.5 }}>
+                Evaluation parameters are the <strong style={{ color: '#90caf9' }}>scoring dimensions</strong> used by an
+                AI judge (LLM) to rate your Dialogflow agent's responses. Each parameter defines <em>what</em> to measure
+                and <em>how</em> to score it, giving you granular insight into response quality beyond a single overall score.
+              </Typography>
+
+              {/* Feature cards */}
+              <Box sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr 1fr' },
+                gap: 2,
+                mb: 2.5,
+              }}>
+                <Box sx={{
+                  p: 2,
+                  borderRadius: 1.5,
+                  backgroundColor: 'rgba(25, 118, 210, 0.08)',
+                  border: '1px solid rgba(25, 118, 210, 0.20)',
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <TuneIcon sx={{ color: '#64b5f6', fontSize: '1.1rem' }} />
+                    <Typography variant="caption" fontWeight={700} sx={{ color: '#90caf9', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Fully Custom
+                    </Typography>
+                  </Box>
+                  <Typography variant="body2" sx={{ color: '#bbb', fontSize: '0.8rem', lineHeight: 1.6 }}>
+                    Define any quality dimension — empathy, accuracy, tone, completeness, compliance — tailored to your use case.
+                  </Typography>
+                </Box>
+
+                <Box sx={{
+                  p: 2,
+                  borderRadius: 1.5,
+                  backgroundColor: 'rgba(46, 125, 50, 0.08)',
+                  border: '1px solid rgba(46, 125, 50, 0.20)',
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <ChartIcon sx={{ color: '#66bb6a', fontSize: '1.1rem' }} />
+                    <Typography variant="caption" fontWeight={700} sx={{ color: '#a5d6a7', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Weighted Scores
+                    </Typography>
+                  </Box>
+                  <Typography variant="body2" sx={{ color: '#bbb', fontSize: '0.8rem', lineHeight: 1.6 }}>
+                    Assign weights when creating test runs so critical parameters count more toward the overall score.
+                  </Typography>
+                </Box>
+
+                <Box sx={{
+                  p: 2,
+                  borderRadius: 1.5,
+                  backgroundColor: 'rgba(156, 39, 176, 0.06)',
+                  border: '1px solid rgba(156, 39, 176, 0.18)',
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <PsychologyIcon sx={{ color: '#ce93d8', fontSize: '1.1rem' }} />
+                    <Typography variant="caption" fontWeight={700} sx={{ color: '#e1bee7', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      AI-Powered
+                    </Typography>
+                  </Box>
+                  <Typography variant="body2" sx={{ color: '#bbb', fontSize: '0.8rem', lineHeight: 1.6 }}>
+                    An LLM judge reads each response and scores it 0-100 on your criteria, with detailed reasoning for every score.
+                  </Typography>
+                </Box>
+
+                <Box sx={{
+                  p: 2,
+                  borderRadius: 1.5,
+                  backgroundColor: 'rgba(255, 167, 38, 0.06)',
+                  border: '1px solid rgba(255, 167, 38, 0.18)',
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <ChecklistIcon sx={{ color: '#ffb74d', fontSize: '1.1rem' }} />
+                    <Typography variant="caption" fontWeight={700} sx={{ color: '#ffe0b2', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Import & Export
+                    </Typography>
+                  </Box>
+                  <Typography variant="body2" sx={{ color: '#bbb', fontSize: '0.8rem', lineHeight: 1.6 }}>
+                    Share evaluation criteria across teams. Export to CSV, refine, and import back — or use seed data to bootstrap.
+                  </Typography>
+                </Box>
+              </Box>
+
+              {/* Quick-start hint */}
+              <Box sx={{
+                p: 2,
+                borderRadius: 1.5,
+                backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                border: '1px dashed rgba(255, 255, 255, 0.12)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+              }}>
+                <Add sx={{ color: '#64b5f6', fontSize: '1.2rem' }} />
+                <Typography variant="body2" sx={{ color: '#aaa', fontSize: '0.85rem' }}>
+                  <strong style={{ color: '#ccc' }}>Get started:</strong> Click <strong style={{ color: '#90caf9' }}>Add Evaluator</strong> to
+                  create your first evaluator, or use the <strong style={{ color: '#90caf9' }}>▾ dropdown</strong> to import a batch from CSV.
+                </Typography>
+              </Box>
+            </Box>
+          </Paper>
+        </Fade>
+      </Collapse>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -271,8 +493,17 @@ const EvaluationManagementPage: React.FC = () => {
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Box sx={{ display: 'flex', gap: 1 }}>
-                    <Tooltip title="Edit Parameter">
+                  <Box sx={{ display: 'flex', gap: 0.5 }}>
+                    <Tooltip title="Export this evaluator as CSV">
+                      <IconButton
+                        size="small"
+                        onClick={() => handleExportSingleParameter(parameter)}
+                        sx={{ color: '#aaa', '&:hover': { color: '#64b5f6' } }}
+                      >
+                        <ExportIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Edit">
                       <IconButton
                         size="small"
                         onClick={() => handleEditParameter(parameter.id)}
@@ -280,7 +511,7 @@ const EvaluationManagementPage: React.FC = () => {
                         <EditIcon />
                       </IconButton>
                     </Tooltip>
-                    <Tooltip title="Delete Parameter">
+                    <Tooltip title="Delete">
                       <IconButton
                         size="small"
                         color="error"
@@ -300,7 +531,7 @@ const EvaluationManagementPage: React.FC = () => {
       {parameters.length === 0 && (
         <Box sx={{ textAlign: 'center', py: 4 }}>
           <Typography variant="body1" color="text.secondary">
-            No evaluation parameters found. Create your first parameter to get started.
+            No evaluators found. Click Add Evaluator to get started.
           </Typography>
         </Box>
       )}
@@ -309,7 +540,7 @@ const EvaluationManagementPage: React.FC = () => {
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
           <Typography>
-            Are you sure you want to delete the parameter "{parameterToDelete?.name}"?
+            Are you sure you want to delete the evaluator "{parameterToDelete?.name}"?
             This action cannot be undone.
           </Typography>
         </DialogContent>
@@ -323,10 +554,15 @@ const EvaluationManagementPage: React.FC = () => {
 
       {/* Import Dialog */}
       <Dialog open={importDialogOpen} onClose={handleCloseImportDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>Import Evaluation Parameters</DialogTitle>
+        <DialogTitle>Import Evaluators from CSV</DialogTitle>
         <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            Upload a CSV file to create or update evaluators. You can use a file exported from this page
+            (via the <ExportIcon sx={{ fontSize: '0.9rem', verticalAlign: 'middle', mx: 0.3 }} /> icon on each row) as a starting point.
+          </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Upload a CSV file with evaluation parameters. Required columns: name. Optional columns: description, prompt_template, is_system_default, is_active.
+            <strong>Required column:</strong> name.<br />
+            <strong>Optional columns:</strong> description, evaluation_task, scoring_guidelines, is_system_default, is_active.
           </Typography>
           
           <input
@@ -344,12 +580,12 @@ const EvaluationManagementPage: React.FC = () => {
                   onChange={(e) => setReplaceExisting(e.target.checked)}
                 />
               }
-              label="Replace existing parameters"
+              label="Replace existing evaluators with same name"
             />
           </FormGroup>
           
           <Typography variant="caption" color="text.secondary">
-            Note: Only administrators and test managers can import evaluation parameters.
+            Tip: Export an evaluator, edit the CSV, and re-import to quickly duplicate or tweak scoring criteria.
           </Typography>
         </DialogContent>
         <DialogActions>

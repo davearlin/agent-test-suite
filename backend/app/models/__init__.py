@@ -226,7 +226,7 @@ class EvaluationParameter(Base):
     __tablename__ = "evaluation_parameters"
     
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)  # e.g., "Similarity Score", "Empathy Level"
+    name = Column(String, nullable=False, unique=True)  # e.g., "Similarity Score", "Empathy Level"
     description = Column(Text)  # Human-readable description
     prompt_template = Column(Text, nullable=True)  # Custom prompt for custom parameters
     is_system_default = Column(Boolean, default=False)  # System-defined vs user-created

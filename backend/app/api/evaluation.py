@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
 import pandas as pd
 import io
+import re
 
 from app.core.database import get_db
 from app.core.csv_utils import escape_csv_value
@@ -27,6 +28,59 @@ from app.models.schemas import (
 )
 
 router = APIRouter(prefix="/evaluation", tags=["evaluation"])
+
+
+def parse_prompt_template(template: str) -> dict:
+    """Parse a prompt_template string to extract evaluation_task and scoring_guidelines.
+    
+    Mirrors the frontend's parsePromptTemplate() logic. The prompt_template contains
+    the full LLM prompt with markdown section headers. This extracts the editable parts.
+    """
+    if not template:
+        return {"evaluation_task": "", "scoring_guidelines": ""}
+    
+    task_match = re.search(
+        r'\*\*Evaluation Task[^*]*?\*\*\s*\n(.*?)(?=\n\s*\*\*Scoring Guidelines:\*\*)',
+        template, re.DOTALL
+    )
+    guidelines_match = re.search(
+        r'\*\*Scoring Guidelines:\*\*\s*\n(.*?)(?=\n\s*\*\*Response Format:\*\*)',
+        template, re.DOTALL
+    )
+    
+    return {
+        "evaluation_task": task_match.group(1).strip() if task_match else "",
+        "scoring_guidelines": guidelines_match.group(1).strip() if guidelines_match else "",
+    }
+
+
+def build_prompt_template(evaluation_task: str, scoring_guidelines: str) -> str:
+    """Reconstruct a full prompt_template from evaluation_task and scoring_guidelines.
+    
+    Mirrors the frontend's buildEvaluationPrompt() function exactly.
+    """
+    return f"""You are an expert AI judge evaluating conversational AI responses for a customer service system.
+
+**Context:**
+Question: "{{question}}"
+Expected Answer: "{{expected_answer}}"
+Actual Answer: "{{actual_answer}}"
+
+**Evaluation Task:**
+{evaluation_task}
+
+**Scoring Guidelines:**
+{scoring_guidelines}
+
+**Response Format:**
+SCORE: [0-100]
+REASONING: [Your detailed explanation of the assessment]
+
+**Important Instructions:**
+- Score must be between 0-100
+- Provide clear reasoning for your score
+- Consider the context and user's needs
+- Be consistent and objective in your evaluation"""
 
 
 @router.get("/parameters", response_model=List[EvaluationParameterSchema])
@@ -73,14 +127,16 @@ async def export_evaluation_parameters_csv(
                 detail="No evaluation parameters found"
             )
 
-        headers = ['name', 'description', 'prompt_template', 'is_system_default', 'is_active']
+        headers = ['name', 'description', 'evaluation_task', 'scoring_guidelines', 'is_system_default', 'is_active']
         csv_rows = [','.join(headers)]
 
         for param in parameters:
+            parsed = parse_prompt_template(param.prompt_template or "")
             row = [
                 escape_csv_value(param.name),
                 escape_csv_value(param.description),
-                escape_csv_value(param.prompt_template),
+                escape_csv_value(parsed["evaluation_task"]),
+                escape_csv_value(parsed["scoring_guidelines"]),
                 str(param.is_system_default).lower(),
                 str(param.is_active).lower()
             ]
@@ -99,6 +155,65 @@ async def export_evaluation_parameters_csv(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error exporting evaluation parameters: {str(e)}"
+        )
+
+
+@router.get("/parameters/export/{parameter_id}")
+async def export_single_evaluation_parameter_csv(
+    parameter_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Export a single evaluation parameter as a CSV file ready for re-import."""
+    try:
+        param = db.query(EvaluationParameter).filter(
+            EvaluationParameter.id == parameter_id
+        ).first()
+
+        if not param:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Evaluation parameter not found"
+            )
+
+        # Check access
+        if not param.is_system_default and param.created_by_id != current_user.id:
+            if current_user.role != "admin":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Access denied to this parameter"
+                )
+
+        headers = ['name', 'description', 'evaluation_task', 'scoring_guidelines', 'is_system_default', 'is_active']
+        csv_rows = [','.join(headers)]
+
+        parsed = parse_prompt_template(param.prompt_template or "")
+        row = [
+            escape_csv_value(param.name),
+            escape_csv_value(param.description),
+            escape_csv_value(parsed["evaluation_task"]),
+            escape_csv_value(parsed["scoring_guidelines"]),
+            str(param.is_system_default).lower(),
+            str(param.is_active).lower()
+        ]
+        csv_rows.append(','.join(row))
+
+        csv_content = '\n'.join(csv_rows)
+        safe_name = "".join(c if c.isalnum() or c in ('-', '_') else '_' for c in (param.name or 'parameter'))
+        filename = f"evaluation_parameter_{safe_name}.csv"
+
+        return Response(
+            content=csv_content,
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error exporting evaluation parameter: {str(e)}"
         )
 
 
@@ -147,9 +262,20 @@ async def import_evaluation_parameters_csv(
                     continue
 
                 description = str(row.get('description', '')).strip() if pd.notna(row.get('description')) else None
-                prompt_template = str(row.get('prompt_template', '')).strip() if pd.notna(row.get('prompt_template')) else None
                 is_system_default = str(row.get('is_system_default', 'false')).lower() in ['true', '1', 'yes']
                 is_active = str(row.get('is_active', 'true')).lower() in ['true', '1', 'yes']
+
+                # Support two CSV formats:
+                # 1. New format: separate evaluation_task + scoring_guidelines columns (preferred)
+                # 2. Legacy format: raw prompt_template column (backward compat)
+                has_new_columns = 'evaluation_task' in df.columns or 'scoring_guidelines' in df.columns
+                
+                if has_new_columns:
+                    evaluation_task = str(row.get('evaluation_task', '')).strip() if pd.notna(row.get('evaluation_task')) else ''
+                    scoring_guidelines = str(row.get('scoring_guidelines', '')).strip() if pd.notna(row.get('scoring_guidelines')) else ''
+                    prompt_template = build_prompt_template(evaluation_task, scoring_guidelines) if (evaluation_task or scoring_guidelines) else None
+                else:
+                    prompt_template = str(row.get('prompt_template', '')).strip() if pd.notna(row.get('prompt_template')) else None
 
                 if is_system_default and current_user.role != "admin":
                     is_system_default = False
@@ -257,6 +383,16 @@ async def create_evaluation_parameter(
             detail="Custom parameters must have a prompt template"
         )
     
+    # Check for duplicate name
+    existing = db.query(EvaluationParameter).filter(
+        EvaluationParameter.name == parameter.name.strip()
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"An evaluation parameter named '{parameter.name.strip()}' already exists. Please choose a unique name."
+        )
+    
     db_parameter = EvaluationParameter(
         **parameter.dict(),
         created_by_id=current_user.id,
@@ -300,8 +436,22 @@ async def update_evaluation_parameter(
             detail="Can only modify your own parameters"
         )
     
+    # Check for duplicate name if name is being changed
+    update_data = parameter_update.dict(exclude_unset=True)
+    if 'name' in update_data and update_data['name']:
+        new_name = update_data['name'].strip()
+        existing = db.query(EvaluationParameter).filter(
+            EvaluationParameter.name == new_name,
+            EvaluationParameter.id != parameter_id
+        ).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"An evaluation parameter named '{new_name}' already exists. Please choose a unique name."
+            )
+    
     # Update fields
-    for field, value in parameter_update.dict(exclude_unset=True).items():
+    for field, value in update_data.items():
         setattr(db_parameter, field, value)
     
     db.commit()

@@ -12,8 +12,18 @@ import {
   FormControlLabel,
   Divider,
   IconButton,
+  Collapse,
+  Stepper,
+  Step,
+  StepLabel,
+  StepContent,
 } from '@mui/material';
-import { ArrowBack as ArrowBackIcon, Save as SaveIcon } from '@mui/icons-material';
+import {
+  ArrowBack as ArrowBackIcon,
+  Save as SaveIcon,
+  InfoOutlined as InfoIcon,
+  Close as CloseIcon,
+} from '@mui/icons-material';
 import ScoringGuidelinesEditor from '../components/ScoringGuidelinesEditor';
 import { apiService } from '../services/api';
 
@@ -62,6 +72,7 @@ const EditEvaluationParameterPage: React.FC = () => {
   const [loading, setLoading] = useState(!isCreateMode);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showGuide, setShowGuide] = useState(false);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -241,16 +252,99 @@ const EditEvaluationParameterPage: React.FC = () => {
   return (
     <Box>
       {/* Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
           <IconButton onClick={handleBack} sx={{ mr: 2 }}>
             <ArrowBackIcon />
           </IconButton>
           <Typography variant="h4" component="h1">
-            {isCreateMode ? 'Create Evaluation Parameter' : 'Edit Evaluation Parameter'}
+            {isCreateMode ? 'Create Evaluator' : 'Edit Evaluator'}
           </Typography>
         </Box>
+        {isCreateMode && (
+          <Button
+            startIcon={<InfoIcon />}
+            onClick={() => setShowGuide(!showGuide)}
+            variant={showGuide ? 'contained' : 'outlined'}
+            size="small"
+            sx={{
+              borderColor: '#555',
+              color: showGuide ? '#fff' : '#aaa',
+              backgroundColor: showGuide ? 'rgba(25, 118, 210, 0.15)' : 'transparent',
+              '&:hover': {
+                borderColor: '#1976d2',
+                backgroundColor: showGuide ? 'rgba(25, 118, 210, 0.25)' : 'rgba(25, 118, 210, 0.08)',
+              },
+            }}
+          >
+            {showGuide ? 'Hide Guide' : 'Getting Started'}
+          </Button>
+        )}
       </Box>
+
+      {/* Getting Started Guide */}
+      <Collapse in={showGuide}>
+        <Paper
+          elevation={0}
+          sx={{
+            mb: 3,
+            overflow: 'hidden',
+            border: '1px solid rgba(25, 118, 210, 0.25)',
+            borderRadius: 2,
+            background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.06) 0%, rgba(102, 187, 106, 0.04) 100%)',
+          }}
+        >
+          <Box sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            px: 3,
+            py: 1.5,
+            borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+            background: 'rgba(25, 118, 210, 0.08)',
+          }}>
+            <Typography variant="subtitle1" fontWeight={600} sx={{ color: '#e3f2fd' }}>
+              How Evaluation Parameters Work
+            </Typography>
+            <IconButton size="small" onClick={() => setShowGuide(false)} sx={{ color: '#999' }}>
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </Box>
+          <Box sx={{ px: 3, py: 2.5 }}>
+            <Typography variant="body2" sx={{ color: '#ccc', mb: 2.5, lineHeight: 1.7 }}>
+              Evaluation parameters define <strong style={{ color: '#90caf9' }}>what the AI judge measures</strong> when
+              scoring your Dialogflow agent's responses. Each parameter becomes a separate scoring dimension in your test results.
+            </Typography>
+            <Stepper orientation="vertical" activeStep={-1} sx={{
+              '& .MuiStepLabel-label': { color: '#bbb', fontSize: '0.875rem' },
+              '& .MuiStepConnector-line': { borderColor: 'rgba(255,255,255,0.1)' },
+              '& .MuiStepIcon-root': { color: 'rgba(25, 118, 210, 0.4)' },
+              '& .MuiStepIcon-text': { fill: '#fff' },
+            }}>
+              <Step expanded>
+                <StepLabel>
+                  <strong>Name & Describe</strong> — Give it a clear name like "Empathy Level" or "Answer Accuracy"
+                </StepLabel>
+              </Step>
+              <Step expanded>
+                <StepLabel>
+                  <strong>Define the Task</strong> — Tell the AI judge exactly what to evaluate (e.g., "Assess whether the response demonstrates understanding of the user's emotional state")
+                </StepLabel>
+              </Step>
+              <Step expanded>
+                <StepLabel>
+                  <strong>Set Scoring Guidelines</strong> — Define what each score range (0-100) means so the judge scores consistently
+                </StepLabel>
+              </Step>
+              <Step expanded>
+                <StepLabel>
+                  <strong>Use in Test Runs</strong> — Activate the parameter and select it when creating test runs. Results show per-parameter scores and reasoning
+                </StepLabel>
+              </Step>
+            </Stepper>
+          </Box>
+        </Paper>
+      </Collapse>
 
       {error && (
         <Alert severity="error" sx={{ mb: 3 }}>
@@ -276,7 +370,7 @@ const EditEvaluationParameterPage: React.FC = () => {
         
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mb: 4 }}>
           <TextField
-            label="Parameter Name"
+            label="Evaluator Name"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             placeholder="e.g., Empathy Level, Similarity Score"
@@ -336,7 +430,7 @@ const EditEvaluationParameterPage: React.FC = () => {
             setScoringGuidelinesValid(isValid);
             setScoringGuidelinesErrors(errors);
           }}
-          parameterName={formData.name || 'New Parameter'}
+          parameterName={formData.name || 'New Evaluator'}
         />
       </Paper>
 
@@ -354,7 +448,7 @@ const EditEvaluationParameterPage: React.FC = () => {
           onClick={handleSave}
           disabled={saving || !isFormValid}
         >
-          {saving ? 'Saving...' : (isCreateMode ? 'Create Parameter' : 'Save Changes')}
+          {saving ? 'Saving...' : (isCreateMode ? 'Create Evaluator' : 'Save Changes')}
         </Button>
       </Box>
     </Box>

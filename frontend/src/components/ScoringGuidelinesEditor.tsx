@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -7,10 +7,17 @@ import {
   IconButton,
   Paper,
   Alert,
+  Collapse,
+  Fade,
 } from '@mui/material';
 import {
   Add as AddIcon,
   Delete as DeleteIcon,
+  HelpOutline as HelpIcon,
+  Close as CloseIcon,
+  CheckCircleOutline as CheckIcon,
+  TipsAndUpdates as TipsIcon,
+  AutoFixHigh as MagicIcon,
 } from '@mui/icons-material';
 
 interface ScoreRange {
@@ -35,27 +42,26 @@ const ScoringGuidelinesEditor: React.FC<ScoringGuidelinesEditorProps> = ({
 }) => {
   const [scoreRanges, setScoreRanges] = useState<ScoreRange[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
+  const [showHelp, setShowHelp] = useState(false);
   const isInitialLoad = useRef(true);
-  const isUpdatingFromProps = useRef(false);
+  // Track text we last generated ourselves to avoid re-parsing our own output
+  const lastGeneratedText = useRef<string>('');
 
-  // Initialize with default ranges or parse existing value
+  // Initialize from prop value — only on mount or when value changes externally
   useEffect(() => {
-    // Skip if we're in the middle of updating from user interaction
-    if (isUpdatingFromProps.current) {
+    // If the incoming value matches what we last generated, skip re-parsing
+    // This prevents the focus-stealing cycle: type → onChange → parent updates value → re-parse
+    // Note: only skip if value is non-empty — empty string must fall through to set defaults
+    if (value && value === lastGeneratedText.current) {
       return;
     }
 
     if (value.trim()) {
-      // Try to parse existing guidelines
       const parsed = parseGuidelinesText(value);
       if (parsed.length > 0) {
-        isUpdatingFromProps.current = true;
         setScoreRanges(parsed);
+        lastGeneratedText.current = value;
         isInitialLoad.current = false;
-        // Reset flag after state update
-        setTimeout(() => {
-          isUpdatingFromProps.current = false;
-        }, 0);
         return;
       }
     }
@@ -69,26 +75,20 @@ const ScoringGuidelinesEditor: React.FC<ScoringGuidelinesEditorProps> = ({
         { id: '4', minScore: 30, maxScore: 49, description: 'Poor - meets few criteria, significant issues' },
         { id: '5', minScore: 0, maxScore: 29, description: 'Very Poor - fails to meet criteria' },
       ];
-      isUpdatingFromProps.current = true;
       setScoreRanges(defaultRanges);
       isInitialLoad.current = false;
-      // Immediately notify parent of default content
       const defaultText = formatScoreRangesToText(defaultRanges);
+      lastGeneratedText.current = defaultText;
       onChange(defaultText);
-      // Reset flag after state update
-      setTimeout(() => {
-        isUpdatingFromProps.current = false;
-      }, 0);
     }
   }, [value]);
 
-  // Convert score ranges to text format whenever they change from user interaction
-  useEffect(() => {
-    if (!isInitialLoad.current && !isUpdatingFromProps.current) {
-      const guidelinesText = formatScoreRangesToText(scoreRanges);
-      onChange(guidelinesText);
-    }
-  }, [scoreRanges, onChange]);
+  // Notify parent when ranges change from user interaction
+  const notifyParent = useCallback((ranges: ScoreRange[]) => {
+    const text = formatScoreRangesToText(ranges);
+    lastGeneratedText.current = text;
+    onChange(text);
+  }, [onChange]);
 
   const parseGuidelinesText = (text: string): ScoreRange[] => {
     // Handle both Windows (\r\n) and Unix (\n) line endings
@@ -220,17 +220,23 @@ const ScoringGuidelinesEditor: React.FC<ScoringGuidelinesEditorProps> = ({
       description: 'Enter description for this score range',
     };
 
-    setScoreRanges([...scoreRanges, newRange]);
+    const updated = [...scoreRanges, newRange];
+    setScoreRanges(updated);
+    notifyParent(updated);
   };
 
   const removeRange = (id: string) => {
-    setScoreRanges(scoreRanges.filter(range => range.id !== id));
+    const updated = scoreRanges.filter(range => range.id !== id);
+    setScoreRanges(updated);
+    notifyParent(updated);
   };
 
   const updateRange = (id: string, updates: Partial<ScoreRange>) => {
-    setScoreRanges(scoreRanges.map(range => 
+    const updated = scoreRanges.map(range => 
       range.id === id ? { ...range, ...updates } : range
-    ));
+    );
+    setScoreRanges(updated);
+    notifyParent(updated);
   };
 
   // Validate on changes
@@ -255,20 +261,176 @@ const ScoringGuidelinesEditor: React.FC<ScoringGuidelinesEditorProps> = ({
             Define score ranges (0-100) with clear criteria for each range
           </Typography>
         </Box>
-        <Button
-          startIcon={<AddIcon />}
-          onClick={addRange}
-          variant="contained"
-          sx={{
-            backgroundColor: '#1976d2',
-            '&:hover': {
-              backgroundColor: '#1565c0',
-            }
-          }}
-        >
-          Add Range
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            startIcon={<HelpIcon />}
+            onClick={() => setShowHelp(!showHelp)}
+            variant={showHelp ? 'contained' : 'outlined'}
+            size="small"
+            sx={{
+              borderColor: '#555',
+              color: showHelp ? '#fff' : '#aaa',
+              backgroundColor: showHelp ? 'rgba(25, 118, 210, 0.15)' : 'transparent',
+              '&:hover': {
+                borderColor: '#1976d2',
+                backgroundColor: showHelp ? 'rgba(25, 118, 210, 0.25)' : 'rgba(25, 118, 210, 0.08)',
+              },
+            }}
+          >
+            {showHelp ? 'Hide Guide' : 'How It Works'}
+          </Button>
+          <Button
+            startIcon={<AddIcon />}
+            onClick={addRange}
+            variant="contained"
+            sx={{
+              backgroundColor: '#1976d2',
+              '&:hover': {
+                backgroundColor: '#1565c0',
+              }
+            }}
+          >
+            Add Range
+          </Button>
+        </Box>
       </Box>
+
+      {/* Rich In-Context Help Panel */}
+      <Collapse in={showHelp}>
+        <Fade in={showHelp} timeout={400}>
+          <Paper
+            elevation={0}
+            sx={{
+              mb: 3,
+              p: 0,
+              overflow: 'hidden',
+              border: '1px solid rgba(25, 118, 210, 0.3)',
+              borderRadius: 2,
+              background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.06) 0%, rgba(156, 39, 176, 0.04) 100%)',
+            }}
+          >
+            {/* Help Header */}
+            <Box sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              px: 3,
+              py: 2,
+              borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+              background: 'linear-gradient(90deg, rgba(25, 118, 210, 0.12) 0%, rgba(156, 39, 176, 0.08) 100%)',
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <MagicIcon sx={{ color: '#90caf9', fontSize: '1.3rem' }} />
+                <Typography variant="subtitle1" fontWeight={600} sx={{ color: '#e3f2fd' }}>
+                  Building Custom Evaluation Criteria
+                </Typography>
+              </Box>
+              <IconButton size="small" onClick={() => setShowHelp(false)} sx={{ color: '#999' }}>
+                <CloseIcon fontSize="small" />
+              </IconButton>
+            </Box>
+
+            <Box sx={{ p: 3 }}>
+              {/* What are scoring guidelines */}
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="body2" sx={{ color: '#ccc', lineHeight: 1.7 }}>
+                  Scoring guidelines tell the AI evaluator <strong style={{ color: '#90caf9' }}>how to score</strong> your
+                  Dialogflow agent's responses. Each range maps a numeric score to a quality level, so the LLM judge
+                  knows exactly what "90" vs "40" means for <em>this specific</em> evaluation parameter.
+                </Typography>
+              </Box>
+
+              {/* Three-column tips */}
+              <Box sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 1fr' },
+                gap: 2,
+                mb: 2.5,
+              }}>
+                {/* Tip 1: Coverage */}
+                <Box sx={{
+                  p: 2,
+                  borderRadius: 1.5,
+                  backgroundColor: 'rgba(46, 125, 50, 0.10)',
+                  border: '1px solid rgba(46, 125, 50, 0.25)',
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <CheckIcon sx={{ color: '#66bb6a', fontSize: '1.1rem' }} />
+                    <Typography variant="caption" fontWeight={700} sx={{ color: '#a5d6a7', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Full Coverage
+                    </Typography>
+                  </Box>
+                  <Typography variant="body2" sx={{ color: '#bbb', fontSize: '0.8rem', lineHeight: 1.6 }}>
+                    Ranges should cover the entire 0-100 scale with no gaps or overlaps. The editor validates this automatically.
+                  </Typography>
+                </Box>
+
+                {/* Tip 2: Descriptions */}
+                <Box sx={{
+                  p: 2,
+                  borderRadius: 1.5,
+                  backgroundColor: 'rgba(25, 118, 210, 0.10)',
+                  border: '1px solid rgba(25, 118, 210, 0.25)',
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <TipsIcon sx={{ color: '#64b5f6', fontSize: '1.1rem' }} />
+                    <Typography variant="caption" fontWeight={700} sx={{ color: '#90caf9', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Be Specific
+                    </Typography>
+                  </Box>
+                  <Typography variant="body2" sx={{ color: '#bbb', fontSize: '0.8rem', lineHeight: 1.6 }}>
+                    Write clear, measurable criteria. Instead of "good response", try "Addresses the user's core question with accurate, actionable information."
+                  </Typography>
+                </Box>
+
+                {/* Tip 3: Range design */}
+                <Box sx={{
+                  p: 2,
+                  borderRadius: 1.5,
+                  backgroundColor: 'rgba(156, 39, 176, 0.08)',
+                  border: '1px solid rgba(156, 39, 176, 0.20)',
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <MagicIcon sx={{ color: '#ce93d8', fontSize: '1.1rem' }} />
+                    <Typography variant="caption" fontWeight={700} sx={{ color: '#e1bee7', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Range Design
+                    </Typography>
+                  </Box>
+                  <Typography variant="body2" sx={{ color: '#bbb', fontSize: '0.8rem', lineHeight: 1.6 }}>
+                    3-5 ranges work best. The default five (Excellent, Good, Average, Poor, Very Poor) is a great starting point — customize descriptions for your use case.
+                  </Typography>
+                </Box>
+              </Box>
+
+              {/* Example */}
+              <Box sx={{
+                p: 2,
+                borderRadius: 1.5,
+                backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                border: '1px dashed rgba(255, 255, 255, 0.12)',
+              }}>
+                <Typography variant="caption" fontWeight={600} sx={{ color: '#999', textTransform: 'uppercase', letterSpacing: 0.5, mb: 1, display: 'block' }}>
+                  Example — Empathy Evaluation
+                </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                  <Typography variant="body2" sx={{ color: '#aaa', fontSize: '0.8rem', fontFamily: 'monospace' }}>
+                    <span style={{ color: '#66bb6a', fontWeight: 700 }}>90-100</span> — Demonstrates deep understanding with personalized, compassionate language
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#aaa', fontSize: '0.8rem', fontFamily: 'monospace' }}>
+                    <span style={{ color: '#81c784', fontWeight: 700 }}>70-89</span>&nbsp; — Acknowledges user feelings with appropriate supportive tone
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#aaa', fontSize: '0.8rem', fontFamily: 'monospace' }}>
+                    <span style={{ color: '#ffa726', fontWeight: 700 }}>50-69</span>&nbsp; — Neutral tone; provides correct info but lacks warmth
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#aaa', fontSize: '0.8rem', fontFamily: 'monospace' }}>
+                    <span style={{ color: '#ef5350', fontWeight: 700 }}>0-49</span>&nbsp;&nbsp; — Dismissive, robotic, or ignores emotional context entirely
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+          </Paper>
+        </Fade>
+      </Collapse>
 
       {errors.length > 0 && (
         <Alert severity="error" sx={{ mb: 2 }}>
