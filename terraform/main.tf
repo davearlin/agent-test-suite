@@ -322,10 +322,16 @@ import {
   id = "locations/${var.region}/namespaces/${var.project_id}/services/${var.app_name}-backend-${var.environment}"
 }
 
-# Cloud Run Service
+# Cloud Run Backend Service (internal ingress — only reachable from within GCP project)
 resource "google_cloud_run_service" "backend" {
   name     = "${var.app_name}-backend-${var.environment}"
   location = var.region
+
+  metadata {
+    annotations = {
+      "run.googleapis.com/ingress" = "internal-and-cloud-run"
+    }
+  }
   
   template {
     metadata {
@@ -467,54 +473,105 @@ resource "google_cloud_run_service" "backend" {
   }
 }
 
-# Firebase Configuration
-resource "google_firebase_project" "default" {
-  provider = google-beta
-  project  = var.project_id
+# =============================================================================
+# Frontend Cloud Run Service (public ingress — serves React SPA + proxies API)
+# =============================================================================
 
-  depends_on = [google_project_service.required_apis]
+# Import existing frontend Cloud Run service if it exists
+import {
+  to = google_cloud_run_service.frontend
+  id = "locations/${var.region}/namespaces/${var.project_id}/services/${var.app_name}-frontend-${var.environment}"
 }
 
-# Import existing Firebase web app to avoid quota issues
-# Firebase Web App Management
-# 
-# For NEW environments (prod, staging, etc.):
-#   1. Set create_firebase_app = true in terraform.tfvars
-#   2. Let Terraform create a new Firebase app
-#
-# For EXISTING environments (like this dev environment):
-#   1. Set create_firebase_app = false in terraform.tfvars  
-#   2. Set existing_firebase_app_id to the actual Firebase app ID
-#   3. Run: terraform import google_firebase_web_app.frontend[0] projects/PROJECT_ID/webApps/APP_ID
-#
-# This approach allows each environment to have its own Firebase app configuration
-# without hardcoding app IDs in the Terraform code.
-resource "google_firebase_web_app" "frontend" {
-  count    = var.create_firebase_app ? 1 : 0
-  provider = google-beta
-  
-  project      = var.project_id
-  display_name = "${var.app_name} Frontend ${var.environment}"
-  
-  # Prevent recreation on minor name changes
-  lifecycle {
-    ignore_changes = [display_name]
+resource "google_cloud_run_service" "frontend" {
+  name     = "${var.app_name}-frontend-${var.environment}"
+  location = var.region
+
+  metadata {
+    annotations = {
+      "run.googleapis.com/ingress" = "all"
+    }
   }
-  
-  depends_on = [google_firebase_project.default]
+
+  template {
+    metadata {
+      annotations = {
+        "autoscaling.knative.dev/maxScale"         = "10"
+        "run.googleapis.com/cpu-throttling"        = "true"
+        "run.googleapis.com/execution-environment" = "gen2"
+        "run.googleapis.com/startup-cpu-boost"     = "true"
+      }
+    }
+
+    spec {
+      container_concurrency = 250
+      timeout_seconds       = 300
+      service_account_name  = var.cloud_run_service_account
+
+      containers {
+        image = var.frontend_image
+
+        ports {
+          container_port = 8080
+        }
+
+        resources {
+          limits = {
+            cpu    = "1000m"
+            memory = "512Mi"
+          }
+        }
+
+        startup_probe {
+          http_get {
+            path = "/health"
+            port = 8080
+          }
+          failure_threshold = 3
+          period_seconds    = 10
+          timeout_seconds   = 5
+        }
+
+        # Backend Cloud Run URL — nginx proxies /api/* to this
+        env {
+          name  = "BACKEND_SERVICE_URL"
+          value = google_cloud_run_service.backend.status[0].url
+        }
+      }
+    }
+  }
+
+  traffic {
+    percent         = 100
+    latest_revision = true
+  }
+
+  depends_on = [google_cloud_run_service.backend]
+
+  lifecycle {
+    ignore_changes = [
+      template[0].metadata[0].annotations["run.googleapis.com/operation-id"],
+      template[0].metadata[0].annotations["run.googleapis.com/client-name"],
+      template[0].metadata[0].annotations["run.googleapis.com/client-version"]
+    ]
+  }
 }
 
-# Firebase Hosting Site
-resource "google_firebase_hosting_site" "frontend" {
-  count    = var.create_firebase_app ? 1 : 0
-  provider = google-beta
-  project  = var.project_id
-  site_id  = "dialogflow-agent-tester-${var.environment}"
-  
-  depends_on = [google_firebase_web_app.frontend]
+# IAM: Allow unauthenticated access to the frontend (public website)
+resource "google_cloud_run_service_iam_binding" "frontend_noauth" {
+  location = google_cloud_run_service.frontend.location
+  project  = google_cloud_run_service.frontend.project
+  service  = google_cloud_run_service.frontend.name
+  role     = "roles/run.invoker"
+  members = [
+    "allUsers",
+  ]
 }
 
-# IAM policy to allow unauthenticated invocations
+# IAM: Allow unauthenticated invocations on backend.
+# This is safe because ingress=internal already blocks all external traffic.
+# The allUsers binding is needed so the frontend's nginx proxy (same GCP project)
+# can reach the backend without attaching an identity token.
 resource "google_cloud_run_service_iam_binding" "backend_noauth" {
   location = google_cloud_run_service.backend.location
   project  = google_cloud_run_service.backend.project
@@ -524,3 +581,21 @@ resource "google_cloud_run_service_iam_binding" "backend_noauth" {
     "allUsers",
   ]
 }
+
+# =============================================================================
+# Firebase (retained for project-level config; hosting replaced by Cloud Run)
+# =============================================================================
+
+resource "google_firebase_project" "default" {
+  provider = google-beta
+  project  = var.project_id
+
+  depends_on = [google_project_service.required_apis]
+}
+
+# NOTE: Firebase Hosting is no longer used for the frontend.
+# The frontend is now served by Cloud Run (google_cloud_run_service.frontend).
+# Firebase Web App and Hosting Site resources are kept as comments for reference.
+#
+# resource "google_firebase_web_app" "frontend" { ... }
+# resource "google_firebase_hosting_site" "frontend" { ... }
