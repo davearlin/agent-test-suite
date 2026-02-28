@@ -306,19 +306,88 @@ docker-compose logs -f backend
 
 ## 🏗️ **Architecture**
 
+### **GCP Infrastructure**
+
+```mermaid
+graph TB
+    subgraph "Internet"
+        USER["👤 User Browser"]
+    end
+
+    subgraph "Google Cloud Platform"
+        subgraph "Firebase Hosting"
+            FH["Firebase Hosting<br/>your-app.web.app<br/>(reverse proxy to Cloud Run)"]
+        end
+
+        subgraph "Cloud Run — Public (ingress=all)"
+            FE["Frontend Service<br/>nginx + React SPA<br/>Port 8080"]
+        end
+
+        subgraph "VPC Network"
+            VPC_CONN["VPC Connector"]
+
+            subgraph "Cloud Run — Internal (ingress=internal)"
+                BE["Backend Service<br/>FastAPI + Python 3.11<br/>Port 8080"]
+            end
+
+            subgraph "Private Services"
+                DB[("Cloud SQL PostgreSQL 15")]
+            end
+        end
+
+        AR["Artifact Registry<br/>Docker Images"]
+    end
+
+    subgraph "External APIs"
+        DFCX["Dialogflow CX API"]
+        GEMINI["Google Gemini<br/>LLM Judge"]
+    end
+
+    USER -->|"HTTPS"| FH
+    FH -->|"Cloud Run rewrite"| FE
+    USER -.->|"Direct access also works"| FE
+    FE -->|"nginx /api/* proxy<br/>via VPC Connector<br/>(egress=all-traffic)"| BE
+    BE -->|"VPC Connector"| DB
+    BE -->|"HTTPS"| DFCX
+    BE -->|"HTTPS"| GEMINI
+    AR -.->|"Image pull"| FE
+    AR -.->|"Image pull"| BE
+
+    style FH fill:#ff9800,color:#000
+    style FE fill:#2196f3,color:#fff
+    style BE fill:#9c27b0,color:#fff
+    style DB fill:#4caf50,color:#fff
+    style VPC_CONN fill:#607d8b,color:#fff
+    style AR fill:#795548,color:#fff
+```
+
+**Key Security Design:**
+- The **backend is not publicly accessible** (`ingress=internal`) — all API traffic flows through the frontend's nginx reverse proxy via the VPC connector
+- Both frontend and backend Cloud Run services use the **VPC connector** (`egress=all-traffic`) so that frontend→backend traffic is treated as "internal" by Cloud Run
+- **Firebase Hosting** provides a clean URL (`*.web.app`) and proxies all requests to the Cloud Run frontend
+- The **DNS resolver** inside the VPC-connected frontend container uses `169.254.169.254` (GCE metadata server) since public DNS (8.8.8.8) is unreachable through the VPC connector
+
 ### **Technology Stack**
 - **Frontend**: React 18 + TypeScript + Material-UI + Redux Toolkit
 - **Backend**: FastAPI + Python 3.11 + SQLAlchemy + Celery
 - **Database**: PostgreSQL 15
+- **Reverse Proxy**: nginx (Cloud Run) + Firebase Hosting (proxy)
 - **Session Management**: In-memory sessions (production), Redis (local development)
-- **Deployment**: Docker + Docker Compose + GCP Cloud Run
+- **Deployment**: Docker + Docker Compose + GCP Cloud Run + Firebase Hosting
 
 ### **Services**
 ```
-Frontend (React)     → Port 3000
-Backend (FastAPI)    → Port 8000  
-Database (PostgreSQL)→ Port 5432
-Cache (Redis)        → Port 6379 (local development only)
+Local Development:
+  Frontend (React)     → Port 3000  (nginx proxies /api/* to backend)
+  Backend (FastAPI)    → Port 8000  
+  Database (PostgreSQL)→ Port 5432
+  Cache (Redis)        → Port 6379
+
+Production (GCP):
+  Firebase Hosting     → your-app.web.app (proxy to Cloud Run)
+  Frontend (Cloud Run) → nginx + React SPA, port 8080 (public)
+  Backend (Cloud Run)  → FastAPI, port 8080 (internal only, via VPC)
+  Database (Cloud SQL)  → PostgreSQL 15 (VPC-connected)
 ```
 
 ## 🎯 **Dynamic Evaluation System**
@@ -534,14 +603,22 @@ Using Docker Compose for local development and testing.
 ✅ **API Endpoints**: All frontend API calls use centralized service pattern  
 
 #### **Current GCP Sandbox Architecture** 
-- **🚀 Cloud Run Backend**: `https://your-backend-url.run.app`
-- **🌐 Firebase Hosting**: `https://your-frontend-url.web.app`
+- **🌐 Firebase Hosting**: `https://your-frontend-url.web.app` (proxy to Cloud Run frontend)
+- **🖥️ Cloud Run Frontend**: nginx + React SPA (`ingress=all`)
+- **🚀 Cloud Run Backend**: FastAPI + Python (`ingress=internal`, not publicly accessible)
 - **🗄️ Cloud SQL PostgreSQL**: `dialogflow-tester-postgres-dev` with backup configuration
-- **🔐 VPC Networking**: Private network with VPC connector for Cloud Run database access
+- **🔐 VPC Networking**: Private network with VPC connector on both frontend and backend Cloud Run services
 - **🔑 Workload Identity Federation**: `github-actions-dialogflow@your-gcp-project-id` service account
 - **🌍 Multi-Environment**: Dev environment operational
 
-#### **Recent Infrastructure Changes (September 2025)**
+#### **Recent Infrastructure Changes (February 2026)**
+- ✅ **Backend Security**: Backend Cloud Run set to `ingress=internal` — no longer publicly exposed on ports 80/443
+- ✅ **Frontend on Cloud Run**: Moved frontend from Firebase static hosting to Cloud Run with nginx reverse proxy
+- ✅ **Firebase Hosting Proxy**: Firebase Hosting now proxies to Cloud Run frontend (clean `*.web.app` URL preserved)
+- ✅ **VPC Connector on Frontend**: Frontend uses VPC connector (`egress=all-traffic`) so proxy traffic to backend is "internal"
+- ✅ **Internal DNS Resolution**: nginx uses `169.254.169.254` (GCE metadata DNS) since public DNS is unreachable through VPC
+
+#### **Previous Infrastructure Changes (September 2025)**
 - ✅ **Redis Removal**: Eliminated Redis dependency for cost savings (~$26/month)
 - ✅ **Session Management**: Backend now uses in-memory sessions (suitable for single-instance)
 - ✅ **OAuth Fixes**: Resolved authentication redirects and token management
@@ -557,55 +634,46 @@ Using Docker Compose for local development and testing.
 - OAuth: Working with Google authentication
 
 #### **GCP Architecture & Deployment Flow**
-```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                        Google Cloud Platform - Deployment Architecture          │
-├─────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                 │
-│  ┌────────────────┐   GitHub Actions    ┌─────────────────────────────────────┐  │
-│  │   Developer    │   ──────────────►    │      CI/CD Pipeline                │  │
-│  │   Push to      │                      │                                     │  │
-│  │   main branch  │                      │  ┌─────────────┐ ┌─────────────────┐ │  │
-│  └────────────────┘                      │  │ Frontend    │ │ Backend         │ │  │
-│                                          │  │ Build       │ │ Docker Build    │ │  │
-│                                          │  │ (npm build) │ │ (Container)     │ │  │
-│                                          │  └─────┬───────┘ └─────┬───────────┘ │  │
-│                                          └────────┼─────────────────┼───────────┘  │
-│                                                   │                 │              │
-│                                                   ▼                 ▼              │
-│  ┌─────────────────┐ ◄─── Firebase Deploy ──────────               │              │
-│  │ Firebase        │                                                │              │
-│  │ Hosting         │    Frontend: your-frontend-url.web.app         │              │
-│  │ (Frontend)      │                                                │              │
-│  └─────────────────┘                                                │              │
-│           │                                                         │              │
-│           │ API Calls                        Cloud Run Deploy ──────┘              │
-│           │                                                         │              │
-│           ▼                                                         ▼              │
-│  ┌─────────────────┐    ┌──────────────────────────────────────────────────────┐  │
-│  │                 │    │ Cloud Run Backend                                    │  │
-│  │     Internet    │────│ FastAPI + Python                                     │  │
-│  │     Traffic     │    │ ✅ LIVE: dialogflow-tester-backend-dev-*.a.run.app  │  │
-│  │                 │    │ Port: 8080 (internal)                              │  │
-│  └─────────────────┘    └──────────────────────┬───────────────────────────────┘  │
-│                                                │                                  │
-│                         VPC Connector          │                                  │
-│                    (Secure Database Access)    │                                  │
-│                         ▲                      │                                  │
-│                         │                      ▼                                  │
-│  ┌─────────────────┐    │    ┌──────────────────────────────────────────────────┐  │
-│  │ Artifact        │    │    │ Cloud SQL PostgreSQL                            │  │
-│  │ Registry        │    │    │ ✅ OPERATIONAL: dialogflow-tester-postgres-dev  │  │
-│  │ (Docker Images) │    └────│ Database: dialogflow_tester_dev                 │  │
-│  │                 │         │ VPC-Connected, Encrypted                        │  │
-│  └─────────────────┘         └──────────────────────────────────────────────────┘  │
-│                                                                                 │
-│  ┌─────────────────────────────────────────────────────────────────────────────┐  │
-│  │ Terraform Infrastructure as Code                                            │  │
-│  │ ✅ Manages: VPC, Cloud SQL, Cloud Run, IAM, Networking                     │  │
-│  └─────────────────────────────────────────────────────────────────────────────┘  │
-│                                                                                 │
-└─────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph "CI/CD Pipeline"
+        DEV["Developer Push<br/>to main branch"] --> GHA["GitHub Actions"]
+        GHA --> WIF["Workload Identity Federation"]
+        WIF --> SA["Service Account"]
+    end
+
+    subgraph "Build"
+        SA --> BB["Backend Docker Build"]
+        SA --> FB["Frontend Docker Build"]
+        BB --> AR["Artifact Registry"]
+        FB --> AR
+    end
+
+    subgraph "Deploy"
+        SA --> TF["Terraform Apply"]
+        TF --> BE_DEPLOY["Cloud Run Backend<br/>(ingress=internal)"]
+        TF --> FE_DEPLOY["Cloud Run Frontend<br/>(ingress=all)"]
+        TF --> DB_DEPLOY["Cloud SQL PostgreSQL"]
+        TF --> VPC_DEPLOY["VPC + Connector"]
+        SA --> FBH["Firebase Hosting Deploy<br/>(proxy config only)"]
+    end
+
+    subgraph "Live Services"
+        FBH_LIVE["🌐 your-app.web.app"]
+        FE_LIVE["🖥️ Cloud Run Frontend (nginx + React)"]
+        BE_LIVE["🚀 Cloud Run Backend (FastAPI)"]
+        DB_LIVE["🗄️ Cloud SQL PostgreSQL"]
+    end
+
+    FBH --> FBH_LIVE
+    FBH_LIVE -->|proxy| FE_LIVE
+    FE_LIVE -->|nginx /api/* via VPC| BE_LIVE
+    BE_LIVE -->|VPC| DB_LIVE
+
+    style FBH_LIVE fill:#ff9800,color:#000
+    style FE_LIVE fill:#2196f3,color:#fff
+    style BE_LIVE fill:#9c27b0,color:#fff
+    style DB_LIVE fill:#4caf50,color:#fff
 ```
 
 #### **Deployment Options**

@@ -2,6 +2,63 @@
 
 ## High-Level System Architecture
 
+### Production (GCP Cloud Run)
+
+```mermaid
+graph TB
+    subgraph "Internet"
+        U["👤 User Browser"]
+    end
+
+    subgraph "Google Cloud Platform"
+        subgraph "Firebase Hosting"
+            FH["Firebase Hosting<br/>*.web.app<br/>(reverse proxy)"]
+        end
+
+        subgraph "Cloud Run — Public (ingress=all)"
+            FE["Frontend Service<br/>nginx + React SPA<br/>Port 8080"]
+        end
+
+        subgraph "VPC Network"
+            VPC_CONN["VPC Connector<br/>10.8.0.0/28"]
+
+            subgraph "Cloud Run — Internal (ingress=internal)"
+                BE["Backend Service<br/>FastAPI + Python 3.11<br/>Port 8080"]
+            end
+
+            subgraph "Private Services"
+                DB[("Cloud SQL<br/>PostgreSQL 15")]
+            end
+        end
+    end
+
+    subgraph "External APIs"
+        DFCX["Dialogflow CX API"]
+        GEMINI["Google Gemini<br/>LLM Judge"]
+    end
+
+    U -->|"HTTPS"| FH
+    FH -->|"Cloud Run rewrite"| FE
+    FE -->|"nginx /api/* proxy<br/>via VPC Connector<br/>(egress=all-traffic)"| BE
+    BE -->|"VPC Connector"| DB
+    BE -->|"HTTPS"| DFCX
+    BE -->|"HTTPS"| GEMINI
+
+    style FH fill:#ff9800,color:#000
+    style FE fill:#2196f3,color:#fff
+    style BE fill:#9c27b0,color:#fff
+    style DB fill:#4caf50,color:#fff
+    style VPC_CONN fill:#607d8b,color:#fff
+```
+
+**Production Security Notes:**
+- **Backend is not publicly accessible** (`ingress=internal`) — all API traffic routes through frontend nginx proxy via VPC connector
+- Both frontend and backend Cloud Run services use the VPC connector with `egress=all-traffic` (required because `*.run.app` resolves to public IPs)
+- Firebase Hosting provides a clean URL and proxies all requests to the Cloud Run frontend
+- nginx uses DNS resolver `169.254.169.254` (GCE metadata server) since public DNS is unreachable through VPC connector
+
+### Local Development (Docker Compose)
+
 ```mermaid
 graph TB
     subgraph "Client Layer"
@@ -9,7 +66,7 @@ graph TB
         C[React Frontend<br/>TypeScript + Material-UI]
     end
     
-    subgraph "Container Infrastructure"
+    subgraph "Docker Compose"
         subgraph "Frontend Container"
             N[Nginx<br/>Port 3000]
             R[React App<br/>Static Files]
@@ -21,8 +78,8 @@ graph TB
         end
         
         subgraph "Data Layer"
-            DB[(PostgreSQL Database<br/>agent_evaluator)]
-            FS[File System<br/>Service Account]
+            DB[(PostgreSQL Database<br/>Port 5432)]
+            REDIS[Redis Cache<br/>Port 6379]
         end
     end
     
@@ -33,10 +90,10 @@ graph TB
     
     U --> N
     N --> R
-    R <--> F
+    N -->|"/api/* proxy"| F
     F --> P
     P --> DB
-    P --> FS
+    P --> REDIS
     P --> GC
     P --> GM
     

@@ -11,79 +11,81 @@
 graph TB
     subgraph "GitHub Repository"
         MAIN_BRANCH[main branch]
-        DEV_BRANCH[develop branch] 
-        PR[Pull Request]
         ACTIONS[GitHub Actions ✅]
     end
     
     subgraph "Workload Identity Federation ✅ CONFIGURED"
         WIF_POOL[github-actions-pool]
         WIF_PROVIDER[github-provider]
-        SERVICE_ACCOUNT[github-actions-dialogflow@your-gcp-project-id]
+        SERVICE_ACCOUNT[Service Account]
+    end
+    
+    subgraph "Build Phase"
+        BUILD_BE[Backend Docker Build]
+        BUILD_FE[Frontend Docker Build]
+        AR[Artifact Registry]
     end
     
     subgraph "Google Cloud Platform ✅ DEPLOYED"
         subgraph "Development Environment ✅ ACTIVE"
-            DEV_CLOUD_RUN[Cloud Run Dev ✅ OPERATIONAL]
+            FH[Firebase Hosting ✅<br/>Proxy to Cloud Run]
+            FE_CR[Cloud Run Frontend ✅<br/>nginx + React SPA<br/>ingress=all]
+            BE_CR[Cloud Run Backend ✅<br/>FastAPI + Python<br/>ingress=internal]
             DEV_CLOUD_SQL[Cloud SQL Dev ✅ OPERATIONAL]
-            DEV_VPC[VPC Network ✅ CONFIGURED]
-            DEV_FIREBASE[Firebase Hosting ✅ DEPLOYED]
+            DEV_VPC[VPC + Connector ✅ CONFIGURED]
         end
         
-        subgraph "Production Environment 🚀 READY"
-            PROD_CLOUD_RUN[Cloud Run Prod - Configured]
-            PROD_CLOUD_SQL[Cloud SQL Prod - Configured]
-            PROD_FIREBASE[Firebase Hosting - Ready]
-        end
-        
-        TERRAFORM[Terraform State ✅ MANAGED]
-    end
-    
-    subgraph "CI/CD Workflow ✅ IMPLEMENTED"
-        BUILD[Build & Test Docker Images]
-        DEPLOY_INFRA[Deploy Infrastructure ✅ DONE]
-        DEPLOY_BACKEND[Deploy Backend to Cloud Run ✅ DEPLOYED]
-        DEPLOY_FRONTEND[Deploy Frontend to Firebase ✅ DEPLOYED]
-        HEALTH_CHECK[Health Checks ✅ PASSING]
+        TERRAFORM[Terraform Apply ✅ MANAGED]
     end
     
     MAIN_BRANCH --> ACTIONS
-    DEV_BRANCH --> ACTIONS
-    PR --> BUILD
-    
     ACTIONS --> WIF_POOL
     WIF_POOL --> WIF_PROVIDER
     WIF_PROVIDER --> SERVICE_ACCOUNT
     
-    SERVICE_ACCOUNT --> DEPLOY_INFRA
-    SERVICE_ACCOUNT --> DEPLOY_BACKEND
-    SERVICE_ACCOUNT --> DEPLOY_FRONTEND
+    SERVICE_ACCOUNT --> BUILD_BE
+    SERVICE_ACCOUNT --> BUILD_FE
+    BUILD_BE --> AR
+    BUILD_FE --> AR
     
-    DEPLOY_INFRA --> DEV_CLOUD_SQL
-    DEPLOY_INFRA --> DEV_VPC
-    DEPLOY_INFRA --> TERRAFORM
+    SERVICE_ACCOUNT --> TERRAFORM
+    TERRAFORM --> FE_CR
+    TERRAFORM --> BE_CR
+    TERRAFORM --> DEV_CLOUD_SQL
+    TERRAFORM --> DEV_VPC
     
-    DEPLOY_BACKEND --> DEV_CLOUD_RUN
-    DEPLOY_FRONTEND --> DEV_FIREBASE
+    SERVICE_ACCOUNT --> FH
     
-    DEV_CLOUD_RUN --> HEALTH_CHECK
-    DEV_FIREBASE --> HEALTH_CHECK
+    FH -->|proxy| FE_CR
+    FE_CR -->|nginx /api/* via VPC| BE_CR
+    BE_CR --> DEV_CLOUD_SQL
     
-    HEALTH_CHECK --> DEV_CLOUD_SQL
+    style FH fill:#ff9800,color:#000
+    style FE_CR fill:#2196f3,color:#fff
+    style BE_CR fill:#9c27b0,color:#fff
+    style DEV_CLOUD_SQL fill:#4caf50,color:#fff
 ```
 
 ## Current Infrastructure Status
 
 ### ✅ Deployed Components
-- **Backend**: `https://dialogflow-tester-backend-dev-hs2q4zkodq-uc.a.run.app` (Cloud Run, HEALTHY)
-- **Frontend**: `https://your-frontend-url.web.app` (Firebase Hosting)
+- **Firebase Hosting**: `https://your-frontend-url.web.app` (proxy to Cloud Run frontend)
+- **Cloud Run Frontend**: nginx + React SPA (`ingress=all`, VPC connector with `egress=all-traffic`)
+- **Cloud Run Backend**: FastAPI + Python (`ingress=internal`, not publicly accessible)
 - **Database**: `dialogflow-tester-postgres-dev` (PostgreSQL 15, VPC-connected)
 - **Session Management**: In-memory sessions (cost-optimized, ~$26/month savings)
-- **Networking**: VPC with subnet and connector (`df-tester-connector`)
-- **Security**: Auto-generated database passwords, VPC isolation, OAuth integration
+- **Networking**: VPC with subnet and connector (`df-tester-connector`) on both frontend and backend
+- **Security**: Backend not exposed on public internet, VPC isolation, OAuth integration
 - **GitHub Integration**: Repository secrets configured for automation
 
-### 🎯 Recent Optimizations (September 2025 - October 2025)
+### 🎯 Infrastructure Security Overhaul (February 2026)
+- **Backend Security**: Set backend Cloud Run to `ingress=internal` — no longer publicly exposed on ports 80/443
+- **Frontend on Cloud Run**: Moved frontend from Firebase static hosting to Cloud Run with nginx reverse proxy
+- **Firebase Hosting Proxy**: Firebase Hosting now proxies to Cloud Run frontend (clean `*.web.app` URL preserved)
+- **VPC Connector on Frontend**: Frontend uses VPC connector (`egress=all-traffic`) so proxy traffic to backend is treated as "internal"
+- **Internal DNS Resolution**: nginx uses `169.254.169.254` (GCE metadata server) since public DNS (8.8.8.8) is unreachable through VPC connector
+
+### 🎯 Previous Optimizations (September 2025 - October 2025)
 - **Cost Reduction**: Removed Redis cache infrastructure (~$26/month savings)
 - **Architecture Simplification**: Migrated to in-memory session management
 - **API Consistency**: Fixed frontend URL construction errors
@@ -97,26 +99,9 @@ graph TB
 - **Environment Variables**: Fixed Vite environment variable precedence issues (.env.local override handling)
 - **Deployment Pipeline**: Fully automated GitHub Actions workflow with Terraform and Firebase deployment
     
-    SERVICE_ACCOUNT --> BUILD
-    BUILD --> DEPLOY_INFRA
-    DEPLOY_INFRA --> TERRAFORM
-    TERRAFORM --> VPC
-    
-    VPC --> DEV_CLOUD_SQL
-    VPC --> DEV_REDIS
-    VPC --> PROD_CLOUD_SQL
-    VPC --> PROD_REDIS
-    
-    DEPLOY_INFRA --> DEPLOY_APP
-    DEPLOY_APP --> DEV_CLOUD_RUN
-    DEPLOY_APP --> PROD_CLOUD_RUN
-    DEPLOY_APP --> HEALTH_CHECK
-    
-    style WIF_POOL fill:#e8f5e8
-    style SERVICE_ACCOUNT fill:#fff3e0
-    style TERRAFORM fill:#e3f2fd
-    style HEALTH_CHECK fill:#e1f5fe
 ```
+
+> Note: The above broken mermaid block was a duplicate artifact and has been removed.
 
 ## Security Architecture - Workload Identity Federation
 

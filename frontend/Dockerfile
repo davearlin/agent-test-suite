@@ -38,15 +38,26 @@ COPY . .
 # Build the app
 RUN npm run build
 
-# Production stage - for GCP deployment
+# Production stage - for GCP Cloud Run deployment
+# Uses nginx as a reverse proxy to the backend Cloud Run service (internal ingress).
+# At startup, envsubst replaces $PORT and $BACKEND_SERVICE_URL in the nginx
+# template while leaving nginx variables ($uri, $host, etc.) intact.
 FROM nginx:alpine AS production
 
-# Copy built app
+# Copy built React app
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Copy nginx configuration
+# Copy nginx configurations:
+#   - nginx.conf: used by docker-compose (proxy_pass http://backend:8000)
+#   - nginx.cloud-run.conf.template: used by Cloud Run (env var substitution)
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx.cloud-run.conf.template /etc/nginx/cloud-run.conf.template
 
-EXPOSE 80
+# Default port for Cloud Run (overridden by Cloud Run's PORT env var)
+ENV PORT=8080
 
-CMD ["nginx", "-g", "daemon off;"]
+EXPOSE 8080
+
+# At startup: if BACKEND_SERVICE_URL is set (Cloud Run), generate nginx config
+# from the template; otherwise fall back to the default nginx.conf (local Docker).
+CMD ["/bin/sh", "-c", "if [ -n \"$BACKEND_SERVICE_URL\" ]; then envsubst '$PORT $BACKEND_SERVICE_URL' < /etc/nginx/cloud-run.conf.template > /etc/nginx/conf.d/default.conf; fi && exec nginx -g 'daemon off;'"]

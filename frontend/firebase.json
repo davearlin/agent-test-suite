@@ -1,7 +1,7 @@
 {
   "hosting": {
     "site": "your-firebase-site-name",
-    "public": "dist",
+    "public": "public",
     "ignore": [
       "firebase.json",
       "**/.*",
@@ -10,7 +10,10 @@
     "rewrites": [
       {
         "source": "**",
-        "destination": "/index.html"
+        "run": {
+          "serviceId": "dialogflow-tester-frontend-dev",
+          "region": "us-central1"
+        }
       }
     ]
   }

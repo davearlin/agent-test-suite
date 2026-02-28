@@ -329,7 +329,7 @@ resource "google_cloud_run_service" "backend" {
 
   metadata {
     annotations = {
-      "run.googleapis.com/ingress" = "internal-and-cloud-run"
+      "run.googleapis.com/ingress" = "internal"
     }
   }
   
@@ -497,6 +497,8 @@ resource "google_cloud_run_service" "frontend" {
     metadata {
       annotations = {
         "autoscaling.knative.dev/maxScale"         = "10"
+        "run.googleapis.com/vpc-access-connector"  = google_vpc_access_connector.vpc_connector.name
+        "run.googleapis.com/vpc-access-egress"     = "all-traffic"
         "run.googleapis.com/cpu-throttling"        = "true"
         "run.googleapis.com/execution-environment" = "gen2"
         "run.googleapis.com/startup-cpu-boost"     = "true"

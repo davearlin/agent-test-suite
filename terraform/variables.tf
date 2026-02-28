@@ -35,6 +35,12 @@ variable "backend_image" {
   default     = "gcr.io/PROJECT_ID/dialogflow-tester-backend:latest"
 }
 
+variable "frontend_image" {
+  description = "Docker image for frontend service (nginx reverse proxy + React SPA)"
+  type        = string
+  default     = "gcr.io/PROJECT_ID/dialogflow-tester-frontend:latest"
+}
+
 variable "cors_origins" {
   description = "CORS allowed origins"
   type        = string

@@ -5,13 +5,8 @@ output "backend_url" {
 }
 
 output "frontend_url" {
-  description = "URL of the frontend Firebase Hosting site"
-  value       = var.create_firebase_app ? "https://${google_firebase_hosting_site.frontend[0].site_id}.web.app" : "Firebase hosting not managed by Terraform"
-}
-
-output "frontend_site_id" {
-  description = "Firebase Hosting site ID"
-  value       = var.create_firebase_app ? google_firebase_hosting_site.frontend[0].site_id : "Firebase hosting not managed by Terraform"
+  description = "URL of the frontend Cloud Run service"
+  value       = google_cloud_run_service.frontend.status[0].url
 }
 
 # Database Information
