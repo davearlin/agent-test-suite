@@ -189,23 +189,23 @@ class LLMJudgeService:
         Create a GenerativeModel instance with appropriate authentication.
         
         CRITICAL: We must pass ONLY credentials OR api_key to configure(), never both.
-        When using credentials, we explicitly pass credentials=X and api_key=None to override
-        any environment variable (GOOGLE_API_KEY) that might be set.
+        The SDK treats explicit None values as "provided", so we only pass the one
+        parameter that's actually being used.
         """
         if self.credentials:
-            # Use OAuth credentials - explicitly disable api_key to avoid conflicts
+            # Use OAuth credentials - only pass credentials, not api_key
             print(f"🔐 Configuring genai with OAuth credentials for model {self.model_name}")
-            genai.configure(credentials=self.credentials, api_key=None)
+            genai.configure(credentials=self.credentials)
             return genai.GenerativeModel(model_name=self.model_name)
         elif self.api_key:
-            # Use API key - explicitly disable credentials to avoid conflicts
+            # Use API key - only pass api_key, not credentials
             print(f"🔑 Configuring genai with API key for model {self.model_name}")
-            genai.configure(api_key=self.api_key, credentials=None)
+            genai.configure(api_key=self.api_key)
             return genai.GenerativeModel(model_name=self.model_name)
         else:
             # Use ADC - no explicit auth, will use default credentials
             print(f"☁️ Using ADC for model {self.model_name}")
-            genai.configure(api_key=None, credentials=None)
+            genai.configure()
             return genai.GenerativeModel(self.model_name)
 
     async def evaluate_response(
