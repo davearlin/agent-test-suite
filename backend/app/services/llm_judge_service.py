@@ -1,4 +1,5 @@
 import asyncio
+import os
 from typing import Dict, Any, Optional, List
 import google.generativeai as genai
 from google.api_core import exceptions as gcp_exceptions
@@ -188,25 +189,40 @@ class LLMJudgeService:
         """
         Create a GenerativeModel instance with appropriate authentication.
         
-        CRITICAL: We must pass ONLY credentials OR api_key to configure(), never both.
-        The SDK treats explicit None values as "provided", so we only pass the one
-        parameter that's actually being used.
+        CRITICAL: The google-generativeai SDK auto-reads the GOOGLE_API_KEY env var
+        when no api_key is explicitly provided. On Cloud Run, both GOOGLE_API_KEY
+        and service account credentials exist, so passing credentials alone causes
+        "client_options.api_key and credentials are mutually exclusive". We must
+        temporarily suppress the env var when using credentials-based auth.
         """
         if self.credentials:
-            # Use OAuth credentials - only pass credentials, not api_key
-            print(f"🔐 Configuring genai with OAuth credentials for model {self.model_name}")
-            genai.configure(credentials=self.credentials)
-            return genai.GenerativeModel(model_name=self.model_name)
+            # Temporarily suppress GOOGLE_API_KEY env var so the SDK doesn't
+            # auto-read it alongside our explicit credentials
+            saved_api_key = os.environ.pop('GOOGLE_API_KEY', None)
+            try:
+                print(f"🔐 Configuring genai with OAuth credentials for model {self.model_name}")
+                genai.configure(credentials=self.credentials)
+                model = genai.GenerativeModel(model_name=self.model_name)
+            finally:
+                if saved_api_key is not None:
+                    os.environ['GOOGLE_API_KEY'] = saved_api_key
+            return model
         elif self.api_key:
             # Use API key - only pass api_key, not credentials
             print(f"🔑 Configuring genai with API key for model {self.model_name}")
             genai.configure(api_key=self.api_key)
             return genai.GenerativeModel(model_name=self.model_name)
         else:
-            # Use ADC - no explicit auth, will use default credentials
-            print(f"☁️ Using ADC for model {self.model_name}")
-            genai.configure()
-            return genai.GenerativeModel(self.model_name)
+            # Use ADC - suppress GOOGLE_API_KEY here too to avoid conflict with ADC
+            saved_api_key = os.environ.pop('GOOGLE_API_KEY', None)
+            try:
+                print(f"☁️ Using ADC for model {self.model_name}")
+                genai.configure()
+                model = genai.GenerativeModel(self.model_name)
+            finally:
+                if saved_api_key is not None:
+                    os.environ['GOOGLE_API_KEY'] = saved_api_key
+            return model
 
     async def evaluate_response(
         self,
